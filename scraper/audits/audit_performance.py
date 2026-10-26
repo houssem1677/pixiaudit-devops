@@ -1,85 +1,114 @@
-﻿import asyncio
+﻿
 import asyncio
-import json
 import os
-import shutil
-import uuid
 
+import httpx
 from bs4 import BeautifulSoup
 from utils.logger import get_logger
 
 logger = get_logger("audit_performance")
 
-LIGHTHOUSE_PATH = shutil.which("lighthouse") or shutil.which("lighthouse.cmd")
-logger.info(f"Lighthouse path: {LIGHTHOUSE_PATH}")
+LIGHTHOUSE_SERVICE_URL = os.getenv(
+    "LIGHTHOUSE_SERVICE_URL",
+    "http://lighthouse:8003",
+).rstrip("/")
 
-# Linux temporary directory.
-# In Docker, mount this path as tmpfs to clear its contents on container restart.
-TEMP_BASE = "/tmp"
-OUTPUT_DIR = os.path.join(TEMP_BASE, "pixiaudit_lighthouse")
-os.makedirs(OUTPUT_DIR, exist_ok=True)
-logger.info(f"Lighthouse temporary directory: {OUTPUT_DIR}")
+LIGHTHOUSE_TIMEOUT_SECONDS = 240
 
 
 async def run_performance_audit(pages: list, job_id: str, config: dict) -> dict:
-    thresholds = config["performance"]["thresholds"]
-    strategy = config["performance"]["strategy"]
+    performance_config = config["performance"]
+    thresholds = performance_config["thresholds"]
+    strategy = performance_config["strategy"]
 
-    concurrency = 3
-    max_lh = config["performance"].get("max_pages_lighthouse", len(pages))
+    concurrency = max(
+        1,
+        int(performance_config.get("lighthouse_concurrency", 3)),
+    )
+    max_lh = max(
+        0,
+        int(performance_config.get("max_pages_lighthouse", len(pages))),
+    )
 
     valid_pages = [
-        p for p in pages
-        if p.get("status") == 200 and p.get("html")
+        page for page in pages
+        if page.get("status") == 200 and page.get("html")
     ]
 
     if not valid_pages:
         logger.warning(f"[{job_id}] No valid pages found")
-        return {"job_id": job_id, "pages": [], "anomalies": []}
-
-    if not LIGHTHOUSE_PATH:
-        logger.error(f"[{job_id}] Lighthouse not found — HTML analysis only")
+        return {
+            "job_id": job_id,
+            "pages": [],
+            "anomalies": [],
+        }
 
     lighthouse_pages = valid_pages[:max_lh]
     html_only_pages = valid_pages[max_lh:]
 
     logger.info(
         f"[{job_id}] Performance audit — "
-        f"{len(valid_pages)} pages total — "
-        f"{len(lighthouse_pages)} with Lighthouse — "
+        f"{len(valid_pages)} valid pages — "
+        f"{len(lighthouse_pages)} sent to Lighthouse — "
         f"{len(html_only_pages)} HTML only — "
         f"concurrency={concurrency}"
     )
 
     semaphore = asyncio.Semaphore(concurrency)
-    lh_tasks = [
-        _audit_page(page, strategy, thresholds, job_id, semaphore)
+
+    tasks = [
+        _audit_page(
+            page,
+            strategy,
+            thresholds,
+            job_id,
+            semaphore,
+        )
         for page in lighthouse_pages
     ]
 
     try:
-        lh_results = await asyncio.gather(*lh_tasks, return_exceptions=True)
-        lh_results = [r for r in lh_results if not isinstance(r, Exception)]
+        results = await asyncio.gather(
+            *tasks,
+            return_exceptions=True,
+        )
     except asyncio.CancelledError:
         logger.warning(f"[{job_id}] Performance audit cancelled")
         raise
+
+    lighthouse_results = []
+
+    for result in results:
+        if isinstance(result, asyncio.CancelledError):
+            raise result
+
+        if isinstance(result, Exception):
+            logger.error(
+                f"[{job_id}] Unexpected page audit error: {result}"
+            )
+            continue
+
+        if result:
+            lighthouse_results.append(result)
 
     html_results = [
         _html_only_page(page, thresholds, job_id)
         for page in html_only_pages
     ]
 
-    all_results = [r for r in lh_results if r] + html_results
-    all_anomalies = []
-
-    for result in all_results:
-        all_anomalies.extend(result.get("anomalies", []))
+    all_results = lighthouse_results + html_results
+    all_anomalies = [
+        anomaly
+        for result in all_results
+        for anomaly in result.get("anomalies", [])
+    ]
 
     scores = [
         result["metrics"]["lighthouse_score"]
         for result in all_results
         if result.get("metrics", {}).get("lighthouse_score") is not None
     ]
+
     global_score = round(sum(scores) / len(scores)) if scores else None
 
     logger.info(
@@ -109,11 +138,14 @@ async def _audit_page(
     html = page["html"]
 
     async with semaphore:
-        await asyncio.sleep(2)
         logger.info(f"[{job_id}] Lighthouse + HTML → {url}")
 
         try:
-            lh = await _run_lighthouse(url, strategy, job_id)
+            lighthouse_result = await _run_lighthouse(
+                url,
+                strategy,
+                job_id,
+            )
         except asyncio.CancelledError:
             logger.warning(f"[{job_id}] Lighthouse cancelled for {url}")
             raise
@@ -121,32 +153,48 @@ async def _audit_page(
         html_result = _analyze_html(html, url)
         anomalies = []
 
-        if lh.get("error"):
-            logger.error(f"[{job_id}] Lighthouse failed on {url}: {lh['error']}")
+        if lighthouse_result.get("error"):
+            logger.error(
+                f"[{job_id}] Lighthouse failed on {url}: "
+                f"{lighthouse_result['error']}"
+            )
+
             metrics = {
                 "lighthouse_score": None,
                 "lcp_ms": None,
                 "ttfb_ms": None,
                 "cls": None,
-                "lighthouse_error": lh["error"],
+                "lighthouse_error": lighthouse_result["error"],
             }
-        elif lh.get("score") is None:
-            logger.warning(f"[{job_id}] Lighthouse returned incomplete data for {url}")
+
+        elif lighthouse_result.get("score") is None:
+            logger.warning(
+                f"[{job_id}] Lighthouse returned incomplete data for {url}"
+            )
+
             metrics = {
                 "lighthouse_score": None,
-                "lcp_ms": lh.get("lcp_ms"),
-                "ttfb_ms": lh.get("ttfb_ms"),
-                "cls": lh.get("cls"),
+                "lcp_ms": lighthouse_result.get("lcp_ms"),
+                "ttfb_ms": lighthouse_result.get("ttfb_ms"),
+                "cls": lighthouse_result.get("cls"),
                 "lighthouse_error": "Incomplete Lighthouse data",
             }
+
         else:
             metrics = {
-                "lighthouse_score": lh["score"],
-                "lcp_ms": lh.get("lcp_ms"),
-                "ttfb_ms": lh.get("ttfb_ms"),
-                "cls": lh.get("cls"),
+                "lighthouse_score": lighthouse_result["score"],
+                "lcp_ms": lighthouse_result.get("lcp_ms"),
+                "ttfb_ms": lighthouse_result.get("ttfb_ms"),
+                "cls": lighthouse_result.get("cls"),
             }
-            anomalies.extend(_detect_lighthouse_anomalies(lh, thresholds, url))
+
+            anomalies.extend(
+                _detect_lighthouse_anomalies(
+                    lighthouse_result,
+                    thresholds,
+                    url,
+                )
+            )
 
         anomalies.extend(html_result["anomalies"])
 
@@ -191,96 +239,73 @@ def _html_only_page(page: dict, thresholds: dict, job_id: str) -> dict:
 
 
 async def _run_lighthouse(url: str, strategy: str, job_id: str) -> dict:
-    if not LIGHTHOUSE_PATH:
-        return {"error": "Lighthouse not installed"}
-
-    run_id = uuid.uuid4().hex
-    run_dir = os.path.join(OUTPUT_DIR, run_id)
-    chrome_user_data = os.path.join(run_dir, "chrome")
-    os.makedirs(chrome_user_data, exist_ok=True)
+    endpoint = f"{LIGHTHOUSE_SERVICE_URL}/audit"
 
     try:
-        chrome_flags = (
-            "--headless=new "
-            "--no-sandbox "
-            "--disable-dev-shm-usage "
-            "--disable-gpu "
-            "--disable-blink-features=AutomationControlled "
-            f"--user-data-dir={chrome_user_data} "
-            "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/120.0.0.0 Safari/537.36"
-        )
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(LIGHTHOUSE_TIMEOUT_SECONDS),
+            trust_env=False,
+        ) as client:
+            response = await client.post(
+                endpoint,
+                json={
+                    "url": url,
+                    "strategy": strategy,
+                },
+            )
 
-        cmd = [
-            LIGHTHOUSE_PATH,
-            url,
-            "--output",
-            "json",
-            "--output-path",
-            "stdout",
-            "--only-categories",
-            "performance",
-            "--form-factor",
-            strategy,
-            f"--chrome-flags={chrome_flags}",
-            "--quiet",
-        ]
-
-        env = os.environ.copy()
-        env["TMPDIR"] = run_dir
-        env["TMP"] = run_dir
-        env["TEMP"] = run_dir
-
-        process = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            env=env,
-        )
-
-        stdout, stderr = await asyncio.wait_for(
-            process.communicate(), timeout=240
-        )
-
-        stderr_text = stderr.decode("utf-8", errors="replace") if stderr else ""
-        stdout_text = stdout.decode("utf-8", errors="replace") if stdout else ""
-
-        if process.returncode != 0:
-            logger.error(f"[{job_id}] Lighthouse error: {stderr_text[:300]}")
-            return {"error": stderr_text[:300] or "Lighthouse exited with an error"}
-
-        if not stdout_text.strip():
-            return {"error": "Lighthouse returned empty output"}
+        if response.is_error:
+            error_body = response.text[:300]
+            logger.error(
+                f"[{job_id}] Lighthouse service returned "
+                f"HTTP {response.status_code}: {error_body}"
+            )
+            return {
+                "error": (
+                    f"Lighthouse service HTTP {response.status_code}: "
+                    f"{error_body}"
+                )
+            }
 
         try:
-            data = json.loads(stdout_text)
-            return _parse_lighthouse(data)
-        except json.JSONDecodeError:
-            logger.error(f"[{job_id}] Lighthouse JSON parse error")
-            return {"error": "Invalid JSON from Lighthouse"}
+            data = response.json()
+        except ValueError:
+            return {"error": "Lighthouse service returned invalid JSON"}
 
-    except asyncio.TimeoutError:
-        logger.error(f"[{job_id}] Lighthouse timeout for {url}")
-        return {"error": "Lighthouse timeout after 240s"}
+        if not isinstance(data, dict):
+            return {"error": "Lighthouse service returned an invalid report"}
+
+        if data.get("error"):
+            return {"error": str(data["error"])[:300]}
+
+        return _parse_lighthouse(data)
+
+    except httpx.TimeoutException:
+        logger.error(
+            f"[{job_id}] Lighthouse service timed out for {url}"
+        )
+        return {
+            "error": (
+                f"Lighthouse service timeout after "
+                f"{LIGHTHOUSE_TIMEOUT_SECONDS}s"
+            )
+        }
+
+    except httpx.RequestError as exc:
+        logger.error(
+            f"[{job_id}] Cannot reach Lighthouse service: {exc}"
+        )
+        return {"error": "Cannot connect to Lighthouse service"}
+
     except asyncio.CancelledError:
-        logger.warning(f"[{job_id}] Lighthouse cancelled for {url}")
+        logger.warning(f"[{job_id}] Lighthouse request cancelled for {url}")
         raise
+
     except Exception as exc:
-        logger.error(f"[{job_id}] Lighthouse exception: {exc}")
-        return {"error": str(exc)}
-    finally:
-        # Clean this audit's temporary profile and files.
-        for attempt in range(3):
-            try:
-                if os.path.exists(run_dir):
-                    shutil.rmtree(run_dir)
-                break
-            except (PermissionError, OSError) as exc:
-                if attempt < 2:
-                    await asyncio.sleep(1)
-                else:
-                    logger.warning(f"Could not delete {run_dir}: {exc}")
+        logger.exception(
+            f"[{job_id}] Unexpected Lighthouse client error: {exc}"
+        )
+        return {"error": "Unexpected Lighthouse client error"}
 
 
 def _parse_lighthouse(data: dict) -> dict:
@@ -289,6 +314,7 @@ def _parse_lighthouse(data: dict) -> dict:
 
     score_raw = cats.get("performance", {}).get("score")
     score = int(score_raw * 100) if score_raw is not None else None
+
     ttfb_ms = _get_numeric(audits, "server-response-time")
     lcp_ms = _get_numeric(audits, "largest-contentful-paint")
     cls = _get_numeric(audits, "cumulative-layout-shift")
@@ -373,10 +399,17 @@ def _analyze_html(html: str, url: str) -> dict:
     }
 
 
-def _detect_lighthouse_anomalies(lh: dict, thresholds: dict, url: str) -> list:
+def _detect_lighthouse_anomalies(
+    lh: dict,
+    thresholds: dict,
+    url: str,
+) -> list:
     anomalies = []
 
-    if lh.get("ttfb_ms") is not None and lh["ttfb_ms"] > thresholds["ttfb_ms"]:
+    if (
+        lh.get("ttfb_ms") is not None
+        and lh["ttfb_ms"] > thresholds["ttfb_ms"]
+    ):
         anomalies.append({
             "type": "HIGH_TTFB",
             "detail": (
@@ -388,7 +421,10 @@ def _detect_lighthouse_anomalies(lh: dict, thresholds: dict, url: str) -> list:
             "url": url,
         })
 
-    if lh.get("lcp_ms") is not None and lh["lcp_ms"] > thresholds["lcp_ms"]:
+    if (
+        lh.get("lcp_ms") is not None
+        and lh["lcp_ms"] > thresholds["lcp_ms"]
+    ):
         anomalies.append({
             "type": "HIGH_LCP",
             "detail": (

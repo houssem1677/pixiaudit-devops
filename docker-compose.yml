@@ -88,16 +88,42 @@ services:
       - frontend-network
     restart: unless-stopped
 
+  # Dedicated Node.js + Chrome + Lighthouse service
+  lighthouse:
+    build: ./lighthouse
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:8003/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - backend-network
+    restart: unless-stopped
+
+  # Python scraper: crawling, HTML analysis and audit orchestration
   scraper:
     build: ./scraper
+    environment:
+      LIGHTHOUSE_SERVICE_URL: http://lighthouse:8003
+      BACKEND_URL: http://backend:3001
+    depends_on:
+      lighthouse:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      test: 
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8002/health', timeout=5)"
       interval: 1m30s
       timeout: 30s
       retries: 5
       start_period: 30s
-    tmpfs:
-      - /tmp/pixiaudit_lighthouse:size=256m
     networks:
       - backend-network
     restart: unless-stopped
@@ -163,6 +189,7 @@ services:
       DATABASE_USER: pixiaudit_user
       DATABASE_PASSWORD_FILE: /run/secrets/postgres_password
       DATABASE_NAME: pixiaudit_db
+      SCRAPER_URL: http://scraper:8002
       JWT_SECRET_FILE: /run/secrets/jwt_secret
       SMTP_PASSWORD_FILE: /run/secrets/smtp_password
       SMTP_USER: "adc2c7001@smtp-brevo.com"
@@ -170,6 +197,8 @@ services:
       SMTP_HOST: smtp-relay.brevo.com
       SMTP_PORT: "587"
       JWT_EXPIRES_IN: 7d
+    ports:
+      - "127.0.0.1:3001:3001"
     networks:
       - frontend-network
       - backend-network
