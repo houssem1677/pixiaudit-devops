@@ -1,3 +1,4 @@
+
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
@@ -13,7 +14,7 @@ async function bootstrap() {
     credentials: true,
   });
 
-  // ── Swagger ───────────────────────────────────────────────────────────
+  // Swagger
   const config = new DocumentBuilder()
     .setTitle('PixiAudit API')
     .setDescription('PixiAudit Backend API')
@@ -25,8 +26,12 @@ async function bootstrap() {
   SwaggerModule.setup('api', app, document);
 
   const port = process.env.PORT || 3001;
-  await app.listen(port);
-  console.log(`PixiAudit Backend running on http://localhost:${port}`);
+
+  // Listen on all interfaces inside the Docker container
+  await app.listen(port, '0.0.0.0');
+
+  console.log(`PixiAudit Backend running on port ${port}`);
   console.log(`Swagger docs: http://localhost:${port}/api`);
 }
+
 bootstrap();
