@@ -4,7 +4,7 @@ FROM node:20-alpine AS build
 
 WORKDIR /app
 
-# Install dependencies first for better Docker layer caching
+# Install dependencies for building
 COPY package.json package-lock.json ./
 RUN npm ci
 
@@ -18,18 +18,6 @@ FROM node:20-alpine AS runtime
 
 WORKDIR /app
 
-# Install Chromium and its runtime dependencies for Puppeteer PDF generation
-RUN apk add --no-cache \
-    chromium \
-    nss \
-    freetype \
-    harfbuzz \
-    ca-certificates \
-    ttf-freefont
-
-# Use the system-installed Chromium instead of downloading another browser
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 ENV NODE_ENV=production
 
 # Install production dependencies only

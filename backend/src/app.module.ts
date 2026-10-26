@@ -14,7 +14,6 @@ import { RolesGuard } from './auth/guards/roles.guard';
 import { AuditModule } from './audit/audit.module';
 import { RecommendationsModule } from './recommendations/recommendations.module';
 import { SettingsModule } from './settings/settings.module';
-import { PdfModule } from './pdf/pdf.module';
 
 import { Audit } from './audit/entities/audit.entity';
 import { CrawledPage } from './audit/entities/crawled-page.entity';
@@ -92,7 +91,6 @@ import { HealthController } from './health.controller';
     AuditModule,
     RecommendationsModule,
     SettingsModule,
-    PdfModule,
   ],
 
   controllers: [HealthController],
