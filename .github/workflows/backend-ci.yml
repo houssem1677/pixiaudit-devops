@@ -16,6 +16,21 @@ jobs:
     name: Test and build backend
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: pixiaudit_test
+          POSTGRES_PASSWORD: pixiaudit_test_password
+          POSTGRES_DB: pixiaudit_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pixiaudit_test -d pixiaudit_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     defaults:
       run:
         working-directory: backend
@@ -36,6 +51,15 @@ jobs:
 
       - name: Run unit tests
         run: ./node_modules/.bin/jest --config ./test/jest-unit.json --runInBand
+
+      - name: Run PostgreSQL integration test
+        run: npm run test:integration
+        env:
+          TEST_DATABASE_HOST: 127.0.0.1
+          TEST_DATABASE_PORT: 5432
+          TEST_DATABASE_USER: pixiaudit_test
+          TEST_DATABASE_PASSWORD: pixiaudit_test_password
+          TEST_DATABASE_NAME: pixiaudit_test
 
       - name: Run E2E tests
         run: npm run test:e2e -- --runInBand
