@@ -31,6 +31,16 @@ jobs:
           --health-timeout 5s
           --health-retries 10
 
+      redis:
+        image: redis:7.4.11
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
     defaults:
       run:
         working-directory: backend
@@ -52,7 +62,7 @@ jobs:
       - name: Run unit tests
         run: ./node_modules/.bin/jest --config ./test/jest-unit.json --runInBand
 
-      - name: Run PostgreSQL integration test
+      - name: Run PostgreSQL and Redis integration tests
         run: npm run test:integration
         env:
           TEST_DATABASE_HOST: 127.0.0.1
@@ -60,6 +70,8 @@ jobs:
           TEST_DATABASE_USER: pixiaudit_test
           TEST_DATABASE_PASSWORD: pixiaudit_test_password
           TEST_DATABASE_NAME: pixiaudit_test
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: 6379
 
       - name: Run E2E tests
         run: npm run test:e2e -- --runInBand
