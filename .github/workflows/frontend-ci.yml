@@ -34,7 +34,7 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
+      # Restore Next.js build artifacts to speed up subsequent builds
       - name: Cache Next.js build
         uses: actions/cache@v4
         with:
