@@ -12,7 +12,7 @@ import { RecommendationHistory } from './entities/recommendation-history.entity'
     TypeOrmModule.forFeature([Audit, RecommendationHistory]), // ✅ NEW: Added RecommendationHistory
   ],
   controllers: [RecommendationsController],
-  providers:   [RecommendationsService],
-  exports:     [RecommendationsService],
+  providers: [RecommendationsService],
+  exports: [RecommendationsService],
 })
 export class RecommendationsModule {}

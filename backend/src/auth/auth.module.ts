@@ -1,4 +1,3 @@
-
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -11,10 +10,7 @@ import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
 import { UsersModule } from '../users/users.module';
 
-function readRequiredSecret(
-  config: ConfigService,
-  key: string,
-): string {
+function readRequiredSecret(config: ConfigService, key: string): string {
   const path = config.get<string>(key);
 
   if (!path) {

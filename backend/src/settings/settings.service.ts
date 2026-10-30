@@ -1,7 +1,12 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { AuditSettings, Thresholds, Weights, AnomalyLevel } from './entities/audit-settings.entity';
+import {
+  AuditSettings,
+  Thresholds,
+  Weights,
+  AnomalyLevel,
+} from './entities/audit-settings.entity';
 import { UpdateSettingsDto } from './dto/settings.dto';
 
 // ✅ NEW INTERFACES
@@ -48,18 +53,19 @@ export class SettingsService {
   // ── Update settings ───────────────────────────────────────────────────────
   async updateSettings(dto: UpdateSettingsDto): Promise<AuditSettings> {
     // Validate weights sum to 100
-    const totalWeight = dto.weights.seo + dto.weights.performance + dto.weights.security;
+    const totalWeight =
+      dto.weights.seo + dto.weights.performance + dto.weights.security;
     if (totalWeight !== 100) {
       throw new Error(`Weights must sum to 100, got ${totalWeight}`);
     }
 
-    let settings = await this.getActiveSettings();
+    const settings = await this.getActiveSettings();
 
     // Update settings
     settings.thresholds = dto.thresholds;
     settings.weights = dto.weights;
     settings.anomalyLevels = dto.anomalyLevels;
-    
+
     // ✅ NEW - Update scoring parameters
     if (dto.seoDeductions) {
       settings.seoDeductions = dto.seoDeductions;
@@ -72,7 +78,7 @@ export class SettingsService {
   }
 
   // ── Priority Calculation Algorithm ───────────────────────────────────────
-  
+
   /**
    * Calculate priority level based on score and thresholds
    */
@@ -95,8 +101,9 @@ export class SettingsService {
 
     const weightedScore =
       (seoScore * weights.seo +
-       perfScore * weights.performance +
-       secScore * weights.security) / 100;
+        perfScore * weights.performance +
+        secScore * weights.security) /
+      100;
 
     return Math.round(weightedScore);
   }
@@ -206,8 +213,8 @@ export class SettingsService {
         security: 20,
       },
       anomalyLevels: defaultAnomalyLevels,
-      seoDeductions: defaultSeoDeductions,      // ✅ NEW
-      securityScoring: defaultSecurityScoring,  // ✅ NEW
+      seoDeductions: defaultSeoDeductions, // ✅ NEW
+      securityScoring: defaultSecurityScoring, // ✅ NEW
       isActive: true,
     });
 

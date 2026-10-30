@@ -1,4 +1,3 @@
-
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { getQueueToken } from '@nestjs/bull';
@@ -109,9 +108,7 @@ describe('AuditService', () => {
         config: { checkSeo: true },
       };
 
-      auditRepo.save.mockRejectedValueOnce(
-        new Error('Database unavailable'),
-      );
+      auditRepo.save.mockRejectedValueOnce(new Error('Database unavailable'));
 
       await expect(service.createAudit(dto, 7)).rejects.toThrow(
         'Database unavailable',
@@ -128,9 +125,7 @@ describe('AuditService', () => {
         config: { checkSeo: true },
       };
 
-      auditQueue.add.mockRejectedValueOnce(
-        new Error('Queue unavailable'),
-      );
+      auditQueue.add.mockRejectedValueOnce(new Error('Queue unavailable'));
 
       await expect(service.createAudit(dto, 7)).rejects.toThrow(
         'Queue unavailable',
@@ -187,9 +182,9 @@ describe('AuditService', () => {
     it('throws an error when the audit does not exist', async () => {
       auditRepo.findOne.mockResolvedValue(null);
 
-      await expect(
-        service.cancelAudit('unknown-job'),
-      ).rejects.toThrow('Audit not found');
+      await expect(service.cancelAudit('unknown-job')).rejects.toThrow(
+        'Audit not found',
+      );
 
       expect(auditRepo.update).not.toHaveBeenCalled();
     });
@@ -200,13 +195,11 @@ describe('AuditService', () => {
         jobId: 'audit-123',
       });
 
-      auditRepo.update.mockRejectedValue(
-        new Error('Database update failed'),
-      );
+      auditRepo.update.mockRejectedValue(new Error('Database update failed'));
 
-      await expect(
-        service.cancelAudit('audit-123'),
-      ).rejects.toThrow('Database update failed');
+      await expect(service.cancelAudit('audit-123')).rejects.toThrow(
+        'Database update failed',
+      );
     });
   });
 
@@ -265,9 +258,7 @@ describe('AuditService', () => {
     });
 
     it('rejects a regular user when no user ID is provided', async () => {
-      await expect(
-        service.findAll(undefined, false),
-      ).rejects.toThrow(
+      await expect(service.findAll(undefined, false)).rejects.toThrow(
         'User ID is required to access audits',
       );
 
@@ -276,13 +267,11 @@ describe('AuditService', () => {
     });
 
     it('propagates database errors', async () => {
-      queryBuilder.getMany.mockRejectedValue(
-        new Error('Database unavailable'),
-      );
+      queryBuilder.getMany.mockRejectedValue(new Error('Database unavailable'));
 
-      await expect(
-        service.findAll('7', false),
-      ).rejects.toThrow('Database unavailable');
+      await expect(service.findAll('7', false)).rejects.toThrow(
+        'Database unavailable',
+      );
     });
   });
 
@@ -325,13 +314,11 @@ describe('AuditService', () => {
     });
 
     it('propagates database errors', async () => {
-      auditRepo.findOne.mockRejectedValue(
-        new Error('Database unavailable'),
-      );
+      auditRepo.findOne.mockRejectedValue(new Error('Database unavailable'));
 
-      await expect(
-        service.findOne('audit-123'),
-      ).rejects.toThrow('Database unavailable');
+      await expect(service.findOne('audit-123')).rejects.toThrow(
+        'Database unavailable',
+      );
     });
   });
 
@@ -353,27 +340,18 @@ describe('AuditService', () => {
       expect(auditRepo.find).toHaveBeenCalledWith({
         where: { userId: 7 },
         order: { createdAt: 'DESC' },
-        select: [
-          'id',
-          'jobId',
-          'url',
-          'globalScore',
-          'createdAt',
-          'status',
-        ],
+        select: ['id', 'jobId', 'url', 'globalScore', 'createdAt', 'status'],
       });
 
       expect(result).toEqual(audits);
     });
 
     it('propagates database errors', async () => {
-      auditRepo.find.mockRejectedValue(
-        new Error('Database unavailable'),
-      );
+      auditRepo.find.mockRejectedValue(new Error('Database unavailable'));
 
-      await expect(
-        service.findByUserId(7),
-      ).rejects.toThrow('Database unavailable');
+      await expect(service.findByUserId(7)).rejects.toThrow(
+        'Database unavailable',
+      );
     });
   });
 
@@ -419,9 +397,7 @@ describe('AuditService', () => {
     });
 
     it('rejects a user who does not own the audit', async () => {
-      await expect(
-        service.deleteAudit('audit-123', 99, false),
-      ).rejects.toThrow(
+      await expect(service.deleteAudit('audit-123', 99, false)).rejects.toThrow(
         'Vous ne pouvez pas supprimer cet audit',
       );
 
@@ -432,9 +408,7 @@ describe('AuditService', () => {
     it('rejects deletion when the user ID is missing', async () => {
       await expect(
         service.deleteAudit('audit-123', undefined, false),
-      ).rejects.toThrow(
-        'Vous ne pouvez pas supprimer cet audit',
-      );
+      ).rejects.toThrow('Vous ne pouvez pas supprimer cet audit');
 
       expect(auditRepo.remove).not.toHaveBeenCalled();
     });
@@ -466,28 +440,24 @@ describe('AuditService', () => {
 
     it('propagates queue removal errors without deleting the database record', async () => {
       const job = {
-        remove: jest.fn().mockRejectedValue(
-          new Error('Queue removal failed'),
-        ),
+        remove: jest.fn().mockRejectedValue(new Error('Queue removal failed')),
       };
 
       auditQueue.getJob.mockResolvedValue(job);
 
-      await expect(
-        service.deleteAudit('audit-123', 7, false),
-      ).rejects.toThrow('Queue removal failed');
+      await expect(service.deleteAudit('audit-123', 7, false)).rejects.toThrow(
+        'Queue removal failed',
+      );
 
       expect(auditRepo.remove).not.toHaveBeenCalled();
     });
 
     it('propagates database removal errors', async () => {
-      auditRepo.remove.mockRejectedValue(
-        new Error('Database removal failed'),
-      );
+      auditRepo.remove.mockRejectedValue(new Error('Database removal failed'));
 
-      await expect(
-        service.deleteAudit('audit-123', 7, false),
-      ).rejects.toThrow('Database removal failed');
+      await expect(service.deleteAudit('audit-123', 7, false)).rejects.toThrow(
+        'Database removal failed',
+      );
     });
   });
 });

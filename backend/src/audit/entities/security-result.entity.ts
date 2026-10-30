@@ -1,6 +1,10 @@
 import {
-  Entity, PrimaryGeneratedColumn, Column,
-  CreateDateColumn, OneToOne, JoinColumn,
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  OneToOne,
+  JoinColumn,
 } from 'typeorm';
 import { Audit } from './audit.entity';
 
@@ -9,7 +13,9 @@ export class SecurityResult {
   @PrimaryGeneratedColumn('increment')
   id: number;
 
-  @OneToOne(() => Audit, (audit) => audit.securityResult, { onDelete: 'CASCADE' })
+  @OneToOne(() => Audit, (audit) => audit.securityResult, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'audit_id' })
   audit: Audit;
 

@@ -1,10 +1,13 @@
-// backend/src/users/users.service.ts
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User, Role } from './user.entity';
-import { Audit } from '../audit/entities/audit.entity';                     // <-- ADDED
-import { RecommendationHistory } from '../recommendations/entities/recommendation-history.entity'; // <-- ADDED
+import { Audit } from '../audit/entities/audit.entity';
+import { RecommendationHistory } from '../recommendations/entities/recommendation-history.entity';
 import { CreateUserDto, UpdateUserDto } from './dto/user.dto';
 import * as bcrypt from 'bcrypt';
 
@@ -13,11 +16,22 @@ export class UsersService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
-    @InjectRepository(Audit)                     // <-- ADDED
+
+    @InjectRepository(Audit)
     private readonly auditRepository: Repository<Audit>,
-    @InjectRepository(RecommendationHistory)     // <-- ADDED (needed for module, even if not used directly)
+
+    @InjectRepository(RecommendationHistory)
     private readonly recommendationHistoryRepository: Repository<RecommendationHistory>,
   ) {}
+
+  /**
+   * Remove the password before returning a user.
+   */
+  private toSafeUser(user: User): User {
+    const safeUser = { ...user };
+    delete safeUser.password;
+    return safeUser;
+  }
 
   async findByEmail(email: string): Promise<User | null> {
     return this.userRepository.findOne({ where: { email } });
@@ -47,7 +61,7 @@ export class UsersService {
   // ────────────────────────────────────────────────────────────────────
 
   /**
-   * Get all users with pagination and optional search
+   * Get all users with pagination and optional search.
    */
   async findAll(page: number = 1, limit: number = 10, search?: string) {
     const skip = (page - 1) * limit;
@@ -70,7 +84,7 @@ export class UsersService {
     if (search) {
       queryBuilder.where(
         'user.email ILIKE :search OR user.nom ILIKE :search OR user.prenom ILIKE :search',
-        { search: `%${search}%` }
+        { search: `%${search}%` },
       );
     }
 
@@ -88,12 +102,20 @@ export class UsersService {
   }
 
   /**
-   * Get user by ID (excluding password)
+   * Get user by ID (excluding password).
    */
   async findOne(id: string): Promise<User> {
     const user = await this.userRepository.findOne({
       where: { id },
-      select: ['id', 'email', 'nom', 'prenom', 'role', 'createdAt', 'updatedAt'],
+      select: [
+        'id',
+        'email',
+        'nom',
+        'prenom',
+        'role',
+        'createdAt',
+        'updatedAt',
+      ],
     });
 
     if (!user) {
@@ -104,19 +126,17 @@ export class UsersService {
   }
 
   /**
-   * Create new user (admin only)
+   * Create new user (admin only).
    */
   async createUser(dto: CreateUserDto): Promise<User> {
-    // Check if email already exists
     const existingUser = await this.findByEmail(dto.email);
+
     if (existingUser) {
       throw new BadRequestException('Email already exists');
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(dto.password, 10);
 
-    // Create user
     const user = this.userRepository.create({
       email: dto.email,
       password: hashedPassword,
@@ -127,57 +147,60 @@ export class UsersService {
 
     const savedUser = await this.userRepository.save(user);
 
-    // Return without password
-    const { password, ...result } = savedUser;
-    return result as User;
+    return this.toSafeUser(savedUser);
   }
 
   /**
-   * Update user (admin only)
+   * Update user (admin only).
    */
   async updateUser(id: string, dto: UpdateUserDto): Promise<User> {
     const user = await this.findById(id);
+
     if (!user) {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
 
-    // Check email uniqueness if changing email
+    // Check email uniqueness if changing email.
     if (dto.email && dto.email !== user.email) {
       const existingUser = await this.findByEmail(dto.email);
+
       if (existingUser) {
         throw new BadRequestException('Email already exists');
       }
     }
 
-    // Hash password if provided
+    // Hash password if provided.
     if (dto.password) {
       dto.password = await bcrypt.hash(dto.password, 10);
     }
 
-    // Update user
     Object.assign(user, dto);
+
     const updatedUser = await this.userRepository.save(user);
 
-    // Return without password
-    const { password, ...result } = updatedUser;
-    return result as User;
+    return this.toSafeUser(updatedUser);
   }
 
   /**
-   * Change user role (admin only)
+   * Change user role (admin only).
    */
-  async changeUserRole(id: string, newRole: Role, adminId: string): Promise<User> {
+  async changeUserRole(
+    id: string,
+    newRole: Role,
+    adminId: string,
+  ): Promise<User> {
     const user = await this.findById(id);
+
     if (!user) {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
 
-    // Prevent self-demotion
+    // Prevent self-demotion.
     if (id === adminId && newRole !== Role.ADMIN) {
       throw new BadRequestException('You cannot remove your own admin role');
     }
 
-    // Check if this is the last admin
+    // Check if this is the last admin.
     if (user.role === Role.ADMIN && newRole !== Role.ADMIN) {
       const adminCount = await this.userRepository.count({
         where: { role: Role.ADMIN },
@@ -185,35 +208,37 @@ export class UsersService {
 
       if (adminCount <= 1) {
         throw new BadRequestException(
-          'Cannot remove admin role from the last admin user'
+          'Cannot remove admin role from the last admin user',
         );
       }
     }
 
     user.role = newRole;
+
     const updatedUser = await this.userRepository.save(user);
 
-    // Return without password
-    const { password, ...result } = updatedUser;
-    return result as User;
+    return this.toSafeUser(updatedUser);
   }
 
   /**
-   * Delete user (admin only)
-   * Also deletes all audits (and cascading recommendation history) of the user.
+   * Delete user (admin only).
+   * Also deletes all audits belonging to the user.
+   * Recommendation history is expected to be cascade-deleted
+   * through the audit relation.
    */
   async deleteUser(id: string, adminId: string): Promise<void> {
     const user = await this.findById(id);
+
     if (!user) {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
 
-    // Prevent self-deletion
+    // Prevent self-deletion.
     if (id === adminId) {
       throw new BadRequestException('You cannot delete your own account');
     }
 
-    // Check if this is the last admin
+    // Check if this is the last admin.
     if (user.role === Role.ADMIN) {
       const adminCount = await this.userRepository.count({
         where: { role: Role.ADMIN },
@@ -224,17 +249,15 @@ export class UsersService {
       }
     }
 
-    // ✅ FIX: Delete all audits belonging to this user first.
-    //    The recommendation_history entries will be cascade-deleted automatically
-    //    because RecommendationHistory has { onDelete: 'CASCADE' } on its audit relation.
+    // Delete all audits belonging to the user first.
     await this.auditRepository.delete({ user: { id } });
 
-    // Now delete the user
+    // Delete the user.
     await this.userRepository.remove(user);
   }
 
   /**
-   * Get user statistics (admin only)
+   * Get user statistics (admin only).
    */
   async getUserStats() {
     const [totalUsers, adminCount, userCount] = await Promise.all([

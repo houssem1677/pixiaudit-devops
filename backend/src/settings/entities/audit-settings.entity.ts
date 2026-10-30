@@ -1,4 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
 export type AnomalyLevel = 'Critique' | 'Important' | 'Amélioration';
 
@@ -47,7 +53,7 @@ export class AuditSettings {
   anomalyLevels: Record<string, AnomalyLevel>;
 
   // ✅ NEW COLUMNS
-  @Column('jsonb', { 
+  @Column('jsonb', {
     default: {
       H1_MISSING: 15,
       META_MISSING: 12,
@@ -57,7 +63,7 @@ export class AuditSettings {
       META_TOO_SHORT: 5,
       META_TOO_LONG: 3,
       H1_MULTIPLE: 5,
-    }
+    },
   })
   seoDeductions: SeoDeductions;
 
@@ -67,7 +73,7 @@ export class AuditSettings {
       sslExpiringSoon: -5,
       headerPresent: 10,
       headerMissing: -10,
-    }
+    },
   })
   securityScoring: SecurityScoring;
 

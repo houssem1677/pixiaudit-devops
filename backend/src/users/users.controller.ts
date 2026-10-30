@@ -12,7 +12,11 @@ import {
   DefaultValuePipe,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
-import { CreateUserDto, UpdateUserDto, ChangeUserRoleDto } from './dto/user.dto';
+import {
+  CreateUserDto,
+  UpdateUserDto,
+  ChangeUserRoleDto,
+} from './dto/user.dto';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from './user.entity';
 
@@ -61,10 +65,7 @@ export class UsersController {
    * PATCH /users/:id - Update user
    */
   @Patch(':id')
-  async update(
-    @Param('id') id: string,
-    @Body() updateUserDto: UpdateUserDto,
-  ) {
+  async update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
     return this.usersService.updateUser(id, updateUserDto);
   }
 

@@ -30,12 +30,14 @@ export class AuditProcessor {
   ) {}
 
   @Process('run')
-  async handleAudit(job: Job<{
-    auditId: number;
-    jobId:   string;
-    url:     string;
-    config:  Record<string, any>;
-  }>) {
+  async handleAudit(
+    job: Job<{
+      auditId: number;
+      jobId: string;
+      url: string;
+      config: Record<string, any>;
+    }>,
+  ) {
     const { auditId, jobId, url, config } = job.data;
     console.log(`[AuditProcessor] ── START job_id=${jobId}`);
 
@@ -45,32 +47,32 @@ export class AuditProcessor {
       const configOverride = this._buildConfigOverride(config);
 
       const result = await this.scraperService.scrape({
-        job_id:          jobId,
+        job_id: jobId,
         url,
         config_override: configOverride,
       });
 
-      const pages         = result.pages ?? {};
-      const seoAnomalies:  any[] = [];
+      const pages = result.pages ?? {};
+      const seoAnomalies: any[] = [];
       const perfAnomalies: any[] = [];
-      const secAnomalies:  any[] = [];
+      const secAnomalies: any[] = [];
 
       // ── Process pages ─────────────────────────────────────────────────────
       for (const [pageUrl, pageData] of Object.entries(pages) as any[]) {
         const page = this.pageRepo.create({
-          audit:      { id: auditId },
-          url:        pageUrl,
+          audit: { id: auditId },
+          url: pageUrl,
           httpStatus: 200,
-          depth:      0,
+          depth: 0,
         });
         await this.pageRepo.save(page);
 
         if (pageData.seo) {
           const seo = this.seoRepo.create({
-            page:         { id: page.id },
-            h1Count:      pageData.seo.h1_count      ?? 0,
+            page: { id: page.id },
+            h1Count: pageData.seo.h1_count ?? 0,
             hasCanonical: pageData.seo.has_canonical ?? false,
-            anomalies:    pageData.seo.anomalies     ?? [],
+            anomalies: pageData.seo.anomalies ?? [],
           });
           await this.seoRepo.save(seo);
           seoAnomalies.push(...(pageData.seo.anomalies ?? []));
@@ -78,11 +80,11 @@ export class AuditProcessor {
 
         if (pageData.performance) {
           const perf = this.perfRepo.create({
-            page:      { id: page.id },
-            metrics:   pageData.performance.metrics  || null,
-            causes:    pageData.performance.causes   || null,
+            page: { id: page.id },
+            metrics: pageData.performance.metrics || null,
+            causes: pageData.performance.causes || null,
             anomalies: pageData.performance.anomalies ?? [],
-            status:    'done',
+            status: 'done',
           });
           await this.perfRepo.save(perf);
           perfAnomalies.push(...(pageData.performance.anomalies ?? []));
@@ -92,60 +94,66 @@ export class AuditProcessor {
       // ── Process security (ONE result per audit) ──────────────────────────
       if (result.security) {
         const sec = this.secRepo.create({
-          audit:            { id: auditId },
+          audit: { id: auditId },
           url,
-          sslValid:         result.security.ssl?.ssl_valid          ?? false,
-          sslIssuer:        result.security.ssl?.ssl_issuer,
-          sslExpiry:        result.security.ssl?.ssl_expiry,
+          sslValid: result.security.ssl?.ssl_valid ?? false,
+          sslIssuer: result.security.ssl?.ssl_issuer,
+          sslExpiry: result.security.ssl?.ssl_expiry,
           sslDaysRemaining: result.security.ssl?.ssl_days_remaining,
-          presentHeaders:   result.security.headers?.present        ?? [],
-          missingHeaders:   result.security.headers?.missing        ?? [],
+          presentHeaders: result.security.headers?.present ?? [],
+          missingHeaders: result.security.headers?.missing ?? [],
           anomalies: [
-            ...(result.security.ssl?.anomalies     ?? []),
+            ...(result.security.ssl?.anomalies ?? []),
             ...(result.security.headers?.anomalies ?? []),
           ],
         });
         await this.secRepo.save(sec);
-        secAnomalies.push(...(result.security.ssl?.anomalies     ?? []));
+        secAnomalies.push(...(result.security.ssl?.anomalies ?? []));
         secAnomalies.push(...(result.security.headers?.anomalies ?? []));
       }
 
       // ── Calculate priorities using SettingsService ───────────────────────
       const priorities = await this.settingsService.calculatePriorities({
-        seo:         result.seo_score        ?? null,
+        seo: result.seo_score ?? null,
         performance: result.performance_score ?? null,
-        security:    result.security_score    ?? null,
+        security: result.security_score ?? null,
       });
 
       // ── Update audit with scores and priorities ──────────────────────────
       await this.auditRepo.update(auditId, {
-        status:       'done',
+        status: 'done',
         pagesCrawled: result.pages_crawled ?? 0,
-        globalScore:  priorities.global.score,
-        priorities:   priorities,
-        completedAt:  new Date(),
+        globalScore: priorities.global.score,
+        priorities: priorities,
+        completedAt: new Date(),
       });
 
-      console.log(`[AuditProcessor] ✅ Done — job_id=${jobId}, global_score=${priorities.global.score}`);
+      console.log(
+        `[AuditProcessor] ✅ Done — job_id=${jobId}, global_score=${priorities.global.score}`,
+      );
 
       // ── Generate AI recommendations ──────────────────────────────────────
       await this.recommendationsService.generate({
         auditId,
         jobId,
         url,
-        globalScore:   priorities.global.score,
+        globalScore: priorities.global.score,
         seoAnomalies,
         perfAnomalies,
         secAnomalies,
       });
-
     } catch (error: any) {
-      console.error(`[AuditProcessor] ❌ Failed — job_id=${jobId}:`, error.message);
+      console.error(
+        `[AuditProcessor] ❌ Failed — job_id=${jobId}:`,
+        error.message,
+      );
       await this.auditRepo.update(auditId, { status: 'failed' });
     }
   }
 
-  private _buildConfigOverride(config: Record<string, any>): Record<string, any> {
+  private _buildConfigOverride(
+    config: Record<string, any>,
+  ): Record<string, any> {
     if (!config || Object.keys(config).length === 0) return {};
 
     // If config is already in scraper format, pass through directly
@@ -158,23 +166,25 @@ export class AuditProcessor {
 
     if (config.analyses) {
       override.audits = {
-        seo:         config.analyses.includes('seo_tech'),
+        seo: config.analyses.includes('seo_tech'),
         performance: config.analyses.includes('performance'),
-        security:    config.analyses.includes('security'),
+        security: config.analyses.includes('security'),
       };
     }
 
     override.crawler = {
-      ...(config.maxPages    !== undefined && { max_pages:   config.maxPages }),
-      ...(config.maxDepth    !== undefined && { max_depth:   config.maxDepth }),
-      ...(config.concurrency !== undefined && { concurrency: config.concurrency }),
-      ...(config.delayMs     !== undefined && { delay_ms:    config.delayMs }),
+      ...(config.maxPages !== undefined && { max_pages: config.maxPages }),
+      ...(config.maxDepth !== undefined && { max_depth: config.maxDepth }),
+      ...(config.concurrency !== undefined && {
+        concurrency: config.concurrency,
+      }),
+      ...(config.delayMs !== undefined && { delay_ms: config.delayMs }),
       ...(config.auth && {
         auth: {
-          enabled:        true,
-          login_url:      config.auth.login_url     ?? '',
-          username:       config.auth.username       ?? '',
-          password:       config.auth.password       ?? '',
+          enabled: true,
+          login_url: config.auth.login_url ?? '',
+          username: config.auth.username ?? '',
+          password: config.auth.password ?? '',
           username_field: config.auth.username_field ?? 'username',
           password_field: config.auth.password_field ?? 'password',
         },

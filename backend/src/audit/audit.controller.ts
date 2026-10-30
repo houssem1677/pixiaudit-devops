@@ -1,4 +1,3 @@
-
 import {
   Controller,
   Post,
@@ -20,9 +19,7 @@ import { Public } from '../auth/decorators/public.decorator';
 
 @Controller('audit')
 export class AuditController {
-  constructor(
-    private readonly auditService: AuditService,
-  ) {}
+  constructor(private readonly auditService: AuditService) {}
 
   @Public()
   @Get('health')

@@ -85,7 +85,8 @@ describe('End-to-end audit flow (real backend, PostgreSQL and Bull/Redis)', () =
       REDIS_PORT: process.env.REDIS_PORT ?? '6380',
     });
 
-    const scraperRequests: Array<{ path: string; method: string; body: any }> = [];
+    const scraperRequests: Array<{ path: string; method: string; body: any }> =
+      [];
     const aiRequests: Array<{ path: string; method: string; body: any }> = [];
 
     const scraperFixture = await startJsonFixture((path, method, body) => {
@@ -303,7 +304,8 @@ describe('End-to-end audit flow (real backend, PostgreSQL and Bull/Redis)', () =
       await new Promise((resolve) => setTimeout(resolve, 250));
       history = await historyRepo.findOne({ where: { auditId: audit.id } });
     }
-    if (!history) throw new Error('Timed out waiting for AI recommendation history.');
+    if (!history)
+      throw new Error('Timed out waiting for AI recommendation history.');
     const refreshedAudit = await dataSource.getRepository(Audit).findOneOrFail({
       where: { id: audit.id },
     });
@@ -363,7 +365,9 @@ describe('End-to-end audit flow (real backend, PostgreSQL and Bull/Redis)', () =
 
     expect(history.changeType).toBe('ai_generated');
     expect(history?.version).toBe(1);
-    expect(JSON.parse(history.recommendations)).toEqual(refreshedAudit.recommendations);
+    expect(JSON.parse(history.recommendations)).toEqual(
+      refreshedAudit.recommendations,
+    );
 
     expect(fixtureRequests.scraperRequests).toEqual(
       expect.arrayContaining([

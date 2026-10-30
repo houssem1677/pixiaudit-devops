@@ -11,7 +11,10 @@ export class ScraperService {
     private readonly httpService: HttpService,
     private readonly config: ConfigService,
   ) {
-    this.scraperUrl = this.config.get<string>('SCRAPER_URL', 'http://localhost:8002');
+    this.scraperUrl = this.config.get<string>(
+      'SCRAPER_URL',
+      'http://localhost:8002',
+    );
   }
 
   async scrape(payload: {

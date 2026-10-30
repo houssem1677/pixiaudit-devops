@@ -72,7 +72,9 @@ describe('ScraperService HTTP contract', () => {
       } catch (caught) {
         expect(caught).toBeInstanceOf(HttpException);
         expect((caught as HttpException).getStatus()).toBe(503);
-        expect((caught as Error).message).toContain('Scraper error: Service unavailable');
+        expect((caught as Error).message).toContain(
+          'Scraper error: Service unavailable',
+        );
       }
     });
 
