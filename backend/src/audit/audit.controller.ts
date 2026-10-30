@@ -1,4 +1,3 @@
-
 import {
   Controller,
   Post,
@@ -20,9 +19,7 @@ import { Public } from '../auth/decorators/public.decorator';
 
 @Controller('audit')
 export class AuditController {
-  constructor(
-    private readonly auditService: AuditService,
-  ) {}
+  constructor(private readonly auditService: AuditService) {}
 
   @Public()
   @Get('health')
@@ -42,25 +39,7 @@ export class AuditController {
   @Post()
   @HttpCode(HttpStatus.OK)
   async createAudit(@Body() dto: CreateAuditDto, @Request() req) {
-    console.log('\n========== AUDIT CREATION DEBUG ==========');
-    console.log('Request object keys:', Object.keys(req));
-    console.log('Request user:', req.user);
-    console.log('User ID:', req.user?.id);
-    console.log(
-      'Authorization header:',
-      req.headers.authorization?.substring(0, 50) + '...',
-    );
-    console.log('Body URL:', dto.url);
-    console.log('==========================================\n');
-
-    const result = await this.auditService.createAudit(
-      dto,
-      req.user?.id,
-    );
-
-    console.log('Audit created with userId:', result);
-
-    return result;
+    return this.auditService.createAudit(dto, req.user?.id);
   }
 
   @Public()

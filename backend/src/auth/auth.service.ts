@@ -25,7 +25,8 @@ export class AuthService {
     if (!user) throw new UnauthorizedException('Identifiants invalides');
 
     const passwordMatch = await bcrypt.compare(dto.password, user.password);
-    if (!passwordMatch) throw new UnauthorizedException('Identifiants invalides');
+    if (!passwordMatch)
+      throw new UnauthorizedException('Identifiants invalides');
 
     // ✅ Create token payload
     const tokenPayload = {
@@ -33,11 +34,11 @@ export class AuthService {
       email: user.email,
       role: user.role,
     };
-    
+
     console.log('🔐 [AUTH] Creating token with payload:', tokenPayload);
 
     const token = this.jwtService.sign(tokenPayload);
-    
+
     console.log('🔐 [AUTH] Token created successfully');
 
     return {
@@ -52,22 +53,22 @@ export class AuthService {
     };
   }
 
-async forgotPassword(dto: ForgotPasswordDto) {
-  const user = await this.usersService.findByEmail(dto.email);
-  if (!user) return { message: 'Email envoyé si le compte existe.' };
+  async forgotPassword(dto: ForgotPasswordDto) {
+    const user = await this.usersService.findByEmail(dto.email);
+    if (!user) return { message: 'Email envoyé si le compte existe.' };
 
-  // Générer le token et sauvegarder
-  user.passwordResetToken = crypto.randomBytes(32).toString('hex');
-  user.passwordResetExpires = new Date(Date.now() + 3600000);
-  await this.usersService.save(user);
+    // Générer le token et sauvegarder
+    user.passwordResetToken = crypto.randomBytes(32).toString('hex');
+    user.passwordResetExpires = new Date(Date.now() + 3600000);
+    await this.usersService.save(user);
 
-  const resetUrl = `${this.config.get<string>('FRONTEND_URL', 'http://localhost:3000')}/reset-password?token=${user.passwordResetToken}`;
+    const resetUrl = `${this.config.get<string>('FRONTEND_URL', 'http://localhost:3000')}/reset-password?token=${user.passwordResetToken}`;
 
-  // Email HTML responsive (mobile + web)
-  await this.mailerService.sendMail({
-    to: user.email,
-    subject: 'Réinitialisation de votre mot de passe - PixiAudit',
-    html: `
+    // Email HTML responsive (mobile + web)
+    await this.mailerService.sendMail({
+      to: user.email,
+      subject: 'Réinitialisation de votre mot de passe - PixiAudit',
+      html: `
       <!DOCTYPE html>
       <html>
       <head>
@@ -122,10 +123,10 @@ async forgotPassword(dto: ForgotPasswordDto) {
       </body>
       </html>
     `,
-  });
+    });
 
-  return { message: 'Email envoyé si le compte existe.' };
-}
+    return { message: 'Email envoyé si le compte existe.' };
+  }
 
   async resetPassword(dto: ResetPasswordDto) {
     const user = await this.usersService.findByResetToken(dto.token);

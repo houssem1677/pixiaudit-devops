@@ -1,6 +1,10 @@
 import {
-  Entity, PrimaryGeneratedColumn, Column,
-  CreateDateColumn, OneToOne, JoinColumn,
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  OneToOne,
+  JoinColumn,
 } from 'typeorm';
 import { CrawledPage } from './crawled-page.entity';
 
@@ -9,7 +13,9 @@ export class SeoResult {
   @PrimaryGeneratedColumn('increment')
   id: number;
 
-  @OneToOne(() => CrawledPage, (page) => page.seoResult, { onDelete: 'CASCADE' })
+  @OneToOne(() => CrawledPage, (page) => page.seoResult, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'page_id' })
   page: CrawledPage;
 

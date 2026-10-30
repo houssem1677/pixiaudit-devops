@@ -5,7 +5,9 @@ import { Public } from '../auth/decorators/public.decorator';
 
 @Controller('audit')
 export class RecommendationsController {
-  constructor(private readonly recommendationsService: RecommendationsService) {}
+  constructor(
+    private readonly recommendationsService: RecommendationsService,
+  ) {}
 
   /**
    * PATCH /audit/:jobId/recommendations - Update recommendations manually
@@ -17,7 +19,11 @@ export class RecommendationsController {
     @Request() req: any,
   ) {
     const userId = req.user?.id; // Get authenticated user ID
-    return this.recommendationsService.update(jobId, body.recommendations, userId);
+    return this.recommendationsService.update(
+      jobId,
+      body.recommendations,
+      userId,
+    );
   }
 
   /**

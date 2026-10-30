@@ -1,4 +1,3 @@
-
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -33,9 +32,7 @@ import { HealthController } from './health.controller';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
-        const passwordFile = config.get<string>(
-          'DATABASE_PASSWORD_FILE',
-        );
+        const passwordFile = config.get<string>('DATABASE_PASSWORD_FILE');
 
         if (!passwordFile) {
           throw new Error('DATABASE_PASSWORD_FILE is required');
@@ -51,15 +48,9 @@ import { HealthController } from './health.controller';
           type: 'postgres' as const,
           host: config.get<string>('DATABASE_HOST', 'postgres'),
           port: config.get<number>('DATABASE_PORT', 5432),
-          username: config.get<string>(
-            'DATABASE_USER',
-            'pixiaudit_user',
-          ),
+          username: config.get<string>('DATABASE_USER', 'pixiaudit_user'),
           password,
-          database: config.get<string>(
-            'DATABASE_NAME',
-            'pixiaudit_db',
-          ),
+          database: config.get<string>('DATABASE_NAME', 'pixiaudit_db'),
           entities: [
             User,
             Audit,
