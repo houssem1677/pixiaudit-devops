@@ -1,0 +1,57 @@
+name: Scraper and Lighthouse CI
+
+on:
+  push:
+    paths:
+      - "scraper/**"
+      - "lighthouse/**"
+      - ".github/workflows/scraper-lighthouse-ci.yml"
+  pull_request:
+    paths:
+      - "scraper/**"
+      - "lighthouse/**"
+      - ".github/workflows/scraper-lighthouse-ci.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: scraper-lighthouse-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Scraper tests and Lighthouse integration
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: scraper/requirements.txt
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: lighthouse/package-lock.json
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r scraper/requirements.txt
+          python -m pip install pytest pytest-asyncio
+
+      - name: Install Lighthouse service dependencies
+        working-directory: lighthouse
+        run: npm ci
+
+      - name: Run Scraper unit and integration tests
+        run: PYTHONPATH=scraper python -m pytest -v scraper/tests/

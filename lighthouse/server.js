@@ -14,6 +14,9 @@ const CHROME_PATH =
   process.env.CHROME_PATH || "/usr/bin/google-chrome";
 const MAX_CONCURRENT = Number(process.env.MAX_CONCURRENT || 3);
 const TIMEOUT_MS = 240_000;
+const LIGHTHOUSE_BIN =
+  process.env.LIGHTHOUSE_BIN ||
+  path.join(__dirname, "node_modules/.bin/lighthouse");
 
 let active = 0;
 
@@ -71,7 +74,7 @@ app.post("/audit", async (req, res) => {
 
     const report = await new Promise((resolve, reject) => {
       const child = spawn(
-        path.join(__dirname, "node_modules/.bin/lighthouse"),
+        LIGHTHOUSE_BIN,
         args,
         {
           env: {
