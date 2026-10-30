@@ -188,11 +188,18 @@ async findAll(userId?: string, isAdmin: boolean = false) {
     .orderBy('audit.createdAt', 'DESC');
   
   // ✅ Filter by userId if not admin
-  if (!isAdmin && userId) {
-    console.log('🔒 [AUDIT SERVICE] Filtering by userId:', userId);
-    queryBuilder.where('audit.userId = :userId', { userId });
+  if (isAdmin) {
+  console.log('👑 [AUDIT SERVICE] Admin - showing all audits');
   } else {
-    console.log('👑 [AUDIT SERVICE] Admin - showing all audits');
+  if (!userId) {
+    throw new ForbiddenException(
+      'User ID is required to access audits',
+    );
+  }
+
+  console.log('🔒 [AUDIT SERVICE] Filtering by userId:', userId);
+
+  queryBuilder.where('audit.userId = :userId', { userId });
   }
   
   const audits = await queryBuilder.getMany();
