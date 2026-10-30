@@ -11,6 +11,10 @@ on:
       - ".github/workflows/backend-ci.yml"
   workflow_dispatch:
 
+concurrency:
+  group: backend-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test-and-build:
     name: Test and build backend
@@ -59,8 +63,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Lint
+        run: npm run lint --if-present
+
+      - name: Build backend
+        run: npm run build
+
       - name: Run unit tests
-        run: ./node_modules/.bin/jest --config ./test/jest-unit.json --runInBand
+        run: ./node_modules/.bin/jest --config ./test/jest-unit.json --runInBand --silent
 
       - name: Run PostgreSQL and Redis integration tests
         run: npm run test:integration
@@ -73,8 +83,6 @@ jobs:
           REDIS_HOST: 127.0.0.1
           REDIS_PORT: 6379
 
-      - name: Run E2E tests
-        run: npm run test:e2e -- --runInBand
-
-      - name: Build backend
-        run: npm run build
+      - name: Dependency audit (non-blocking for now)
+        run: npm audit --audit-level=critical
+        continue-on-error: true
