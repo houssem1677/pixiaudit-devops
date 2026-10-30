@@ -1,3 +1,4 @@
+
 import {
   Injectable,
   NotFoundException,
@@ -10,6 +11,8 @@ import { Audit } from '../audit/entities/audit.entity';
 import { RecommendationHistory } from '../recommendations/entities/recommendation-history.entity';
 import { CreateUserDto, UpdateUserDto } from './dto/user.dto';
 import * as bcrypt from 'bcrypt';
+
+type SafeUser = Omit<User, 'password'>;
 
 @Injectable()
 export class UsersService {
@@ -27,10 +30,12 @@ export class UsersService {
   /**
    * Remove the password before returning a user.
    */
-  private toSafeUser(user: User): User {
-    const safeUser = { ...user };
-    delete safeUser.password;
-    return safeUser;
+  private toSafeUser(user: User): SafeUser {
+    const safeUser = Object.fromEntries(
+      Object.entries(user).filter(([key]) => key !== 'password'),
+    );
+
+    return safeUser as SafeUser;
   }
 
   async findByEmail(email: string): Promise<User | null> {
@@ -104,7 +109,7 @@ export class UsersService {
   /**
    * Get user by ID (excluding password).
    */
-  async findOne(id: string): Promise<User> {
+  async findOne(id: string): Promise<SafeUser> {
     const user = await this.userRepository.findOne({
       where: { id },
       select: [
@@ -122,13 +127,13 @@ export class UsersService {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
 
-    return user;
+    return this.toSafeUser(user);
   }
 
   /**
    * Create new user (admin only).
    */
-  async createUser(dto: CreateUserDto): Promise<User> {
+  async createUser(dto: CreateUserDto): Promise<SafeUser> {
     const existingUser = await this.findByEmail(dto.email);
 
     if (existingUser) {
@@ -153,7 +158,7 @@ export class UsersService {
   /**
    * Update user (admin only).
    */
-  async updateUser(id: string, dto: UpdateUserDto): Promise<User> {
+  async updateUser(id: string, dto: UpdateUserDto): Promise<SafeUser> {
     const user = await this.findById(id);
 
     if (!user) {
@@ -188,7 +193,7 @@ export class UsersService {
     id: string,
     newRole: Role,
     adminId: string,
-  ): Promise<User> {
+  ): Promise<SafeUser> {
     const user = await this.findById(id);
 
     if (!user) {
