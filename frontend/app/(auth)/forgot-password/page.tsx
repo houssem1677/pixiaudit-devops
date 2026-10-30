@@ -165,7 +165,7 @@ export default function ForgotPasswordPage() {
                 </p>
                 <div className="bg-gray-50 border border-gray-100 rounded-xl p-4">
                   <p className="text-xs text-gray-500">
-                    📧 Vérifiez vos spams si vous ne trouvez pas l'e-mail.
+                    📧 Vérifiez vos spams si vous ne trouvez pas l&apos;e-mail.
                   </p>
                 </div>
               </div>

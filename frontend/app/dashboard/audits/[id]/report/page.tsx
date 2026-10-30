@@ -114,13 +114,97 @@ function AnomalyBadge({ type, map }: { type: string; map: Record<string, { label
   );
 }
 
-function PageRow({ page, type }: { page: any; type: "seo" | "performance" }) {
+interface PageAnomaly {
+  type: string;
+  detail?: string;
+}
+
+interface PageSeoResult {
+  anomalies?: PageAnomaly[];
+  h1Count?: number;
+  hasCanonical?: boolean;
+}
+
+interface PagePerformanceResult {
+  anomalies?: PageAnomaly[];
+  metrics?: {
+    lighthouse_score?: number | null;
+    lcp_ms?: number | null;
+    ttfb_ms?: number | null;
+    cls?: number | null;
+  };
+}
+
+interface AuditPage {
+  id: string | number;
+  url: string;
+  seoResult?: PageSeoResult | null;
+  performanceResult?: PagePerformanceResult | null;
+}
+
+interface SecurityResult {
+  sslValid: boolean;
+  sslExpiry?: string | null;
+  sslIssuer?: string | null;
+  sslDaysRemaining?: number | null;
+  missingHeaders?: string[];
+  presentHeaders?: string[];
+  anomalies?: PageAnomaly[];
+}
+
+interface PriorityScore {
+  level?: string;
+  score?: number | null;
+}
+
+interface AuditPriorities {
+  seo?: PriorityScore;
+  performance?: PriorityScore;
+  security?: PriorityScore;
+  global?: PriorityScore;
+}
+
+interface RecommendationItem {
+  title: string;
+  description: string;
+}
+
+type Recommendations =
+  | string
+  | RecommendationItem[]
+  | { text: string | RecommendationItem[] }
+  | null;
+
+interface Audit {
+  id: string | number;
+  url: string;
+  status: string;
+  globalScore: number | null;
+  pages: AuditPage[];
+  pagesCrawled: number;
+  createdAt: string | null;
+  completedAt: string | null;
+  securityResult?: SecurityResult | null;
+  priorities?: AuditPriorities | null;
+  recommendations?: Recommendations;
+}
+
+function PageRow({
+  page,
+  type,
+}: {
+  page: AuditPage;
+  type: "seo" | "performance";
+}) {
   const [open, setOpen] = useState(false);
   const result = type === "seo" ? page.seoResult : page.performanceResult;
   if (!result) return null;
   const anomalies = result.anomalies || [];
   const map = type === "seo" ? SEO_TYPE_MAP : PERF_TYPE_MAP;
-  const lhScore = type === "performance" ? result.metrics?.lighthouse_score : null;
+  const lhScore =
+  type === "performance" && "metrics" in result
+    ? result.metrics?.lighthouse_score ?? null
+    : null;
   const lhColor = scoreColor(lhScore);
 
   return (
@@ -155,23 +239,35 @@ function PageRow({ page, type }: { page: any; type: "seo" | "performance" }) {
 
       {open && (
         <div className="px-4 pb-4 pt-0" style={{ borderTop: "1px solid #f0fdf4", background: "#fafafa" }}>
-          {type === "seo" && (
-            <div className="flex gap-4 py-3 mb-3">
-              <div className="flex items-center gap-2">
-                <span style={{ fontSize: "12px", color: "#9ca3af" }}>H1:</span>
-                <span style={{ fontSize: "12px", fontWeight: 600, color: result.h1Count > 0 ? "#16a34a" : "#dc2626" }}>
-                  {result.h1Count}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span style={{ fontSize: "12px", color: "#9ca3af" }}>Canonical:</span>
-                <span style={{ fontSize: "12px", fontWeight: 600, color: result.hasCanonical ? "#16a34a" : "#ca8a04" }}>
-                  {result.hasCanonical ? "Oui" : "Non"}
-                </span>
-              </div>
-            </div>
-          )}
-          {type === "performance" && result.metrics && (
+          {type === "seo" && "h1Count" in result && (
+  <div className="flex gap-4 py-3 mb-3">
+    <div className="flex items-center gap-2">
+      <span style={{ fontSize: "12px", color: "#9ca3af" }}>H1:</span>
+      <span
+        style={{
+          fontSize: "12px",
+          fontWeight: 600,
+          color: (result.h1Count ?? 0) > 0 ? "#16a34a" : "#dc2626",
+        }}
+      >
+        {result.h1Count ?? 0}
+      </span>
+    </div>
+    <div className="flex items-center gap-2">
+      <span style={{ fontSize: "12px", color: "#9ca3af" }}>Canonical:</span>
+      <span
+        style={{
+          fontSize: "12px",
+          fontWeight: 600,
+          color: result.hasCanonical ? "#16a34a" : "#ca8a04",
+        }}
+      >
+        {result.hasCanonical ? "Oui" : "Non"}
+      </span>
+    </div>
+  </div>
+)}
+          {type === "performance" && "metrics" in result && result.metrics && (
             <div className="grid grid-cols-4 gap-3 py-3 mb-3">
               {[
                 { label: "Lighthouse", value: result.metrics.lighthouse_score, unit: "/100" },
@@ -188,7 +284,7 @@ function PageRow({ page, type }: { page: any; type: "seo" | "performance" }) {
           )}
           {anomalies.length > 0 ? (
             <div className="flex flex-col gap-2">
-              {anomalies.map((a: any, i: number) => (
+              {anomalies.map((a, i) => (
                 <div key={i} className="flex items-start gap-3 px-3 py-2.5 rounded-lg"
                   style={{ background: "white", border: "1px solid #e5e7eb" }}>
                   <AnomalyBadge type={a.type} map={map} />
@@ -205,14 +301,20 @@ function PageRow({ page, type }: { page: any; type: "seo" | "performance" }) {
   );
 }
 
-function renderRecsText(r: any): string {
+function renderRecsText(r: Recommendations): string {
   if (!r) return "";
   if (typeof r === "string") return r;
-  if (typeof r === "object" && !Array.isArray(r) && r.text) {
-    return typeof r.text === "string" ? r.text : r.text.map((x: any) => `${x.title}\n${x.description}`).join("\n\n");
-  }
-  if (Array.isArray(r)) return r.map((x: any) => `${x.title}\n${x.description}`).join("\n\n");
-  return JSON.stringify(r);
+
+  const formatItems = (items: RecommendationItem[]) =>
+    items
+      .map((item) => `${item.title}\n${item.description}`)
+      .join("\n\n");
+
+  if (Array.isArray(r)) return formatItems(r);
+
+  return typeof r.text === "string"
+    ? r.text
+    : formatItems(r.text);
 }
 
 function RecsDisplay({ text }: { text: string }) {
@@ -235,7 +337,7 @@ export default function ReportPage() {
   const params = useParams();
   const jobId  = params?.id as string;
 
-  const [audit, setAudit]             = useState<any>(null);
+  const [audit, setAudit]             = useState<Audit | null>(null);
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState("");
   const [activeTab, setActiveTab]     = useState("overview");
@@ -333,17 +435,37 @@ const handleExportPdf = async () => {
   // ✅ FIXED: Single object, not array
   const security    = audit.securityResult || null;
 
-  const seoPages        = pages.filter((p: any) => p.seoResult);
-  const allSeoAnomalies = seoPages.flatMap((p: any) => p.seoResult?.anomalies || []);
-  const seoTypeCount    = allSeoAnomalies.reduce((acc: Record<string, number>, a: any) => {
-    acc[a.type] = (acc[a.type] || 0) + 1; return acc;
-  }, {});
+  const seoPages = pages.filter((p) => p.seoResult);
 
-  const perfPages        = pages.filter((p: any) => p.performanceResult?.metrics?.lighthouse_score > 0);
-  const avgLH            = perfPages.length
-    ? Math.round(perfPages.reduce((s: number, p: any) => s + (p.performanceResult.metrics.lighthouse_score || 0), 0) / perfPages.length)
-    : null;
-  const allPerfAnomalies = pages.flatMap((p: any) => p.performanceResult?.anomalies || []);
+const allSeoAnomalies = seoPages.flatMap(
+  (p) => p.seoResult?.anomalies ?? []
+);
+
+const seoTypeCount = allSeoAnomalies.reduce(
+  (acc: Record<string, number>, a) => {
+    acc[a.type] = (acc[a.type] || 0) + 1;
+    return acc;
+  },
+  {}
+);
+
+const perfPages = pages.filter(
+  (p) => (p.performanceResult?.metrics?.lighthouse_score ?? 0) > 0
+);
+
+const avgLH = perfPages.length
+  ? Math.round(
+      perfPages.reduce(
+        (sum, p) =>
+          sum + (p.performanceResult?.metrics?.lighthouse_score ?? 0),
+        0
+      ) / perfPages.length
+    )
+  : null;
+
+const allPerfAnomalies = pages.flatMap(
+  (p) => p.performanceResult?.anomalies ?? []
+);
 
 const handleSaveRecs = async () => {
   setSavingRecs(true);
@@ -381,17 +503,20 @@ const handleSaveRecs = async () => {
 
     const result = await response.json();
     
-    setAudit((prev: any) => ({
-      ...prev,
-      recommendations: recsText,
-    }));
+    setAudit((prev) =>
+      prev ? { ...prev, recommendations: recsText } : prev
+    );
     
     setEditingRecs(false);
     alert(`✅ Sauvegardé (Version ${result.version})`);
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error:', error);
-    alert(`❌ Erreur: ${error.message}`);
+
+    const message =
+      error instanceof Error ? error.message : "Erreur inconnue";
+
+  alert(`❌ Erreur: ${message}`);
   } finally {
     setSavingRecs(false);
   }
@@ -548,11 +673,11 @@ const handleSaveRecs = async () => {
                         </span>
                       )}
                     </div>
-                    {security.missingHeaders?.length > 0 && (
+                    {(security.missingHeaders?.length ?? 0) > 0 && (
                       <div>
                         <p style={{ fontSize: "12px", color: "#ca8a04", fontWeight: 500, marginBottom: "4px" }}>Headers manquants:</p>
                         <div className="flex flex-wrap gap-1">
-                          {security.missingHeaders.map((h: string) => (
+                          {(security.missingHeaders ?? []).map((h: string) => (
                             <span key={h} className="text-xs px-2 py-0.5 rounded-full"
                               style={{ background: "#fef9c3", color: "#ca8a04" }}>{h}</span>
                           ))}
@@ -590,8 +715,8 @@ const handleSaveRecs = async () => {
               {[
                 { label: "Pages analysées", value: seoPages.length,        color: "#16a34a", bg: "#dcfce7" },
                 { label: "Total anomalies", value: allSeoAnomalies.length, color: "#dc2626", bg: "#fee2e2" },
-                { label: "Pages sans H1",   value: seoPages.filter((p: any) => p.seoResult?.h1Count === 0).length, color: "#ca8a04", bg: "#fef9c3" },
-              ].map(({ label, value, color, bg }) => (
+                { label: "Pages sans H1",   value: seoPages.filter((p) => p.seoResult?.h1Count === 0).length, color: "#ca8a04", bg: "#fef9c3" },
+              ].map(({ label, value, color}) => (
                 <div key={label} className="rounded-2xl p-5 bg-white flex items-center gap-4"
                   style={{ border: "1px solid #d1fae5" }}>
                   <div>
@@ -644,7 +769,7 @@ const handleSaveRecs = async () => {
                 <h3 style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "15px", color: "#14532d" }}>Détail par page</h3>
               </div>
               <div className="p-4 flex flex-col gap-2">
-                {seoPages.map((p: any) => <PageRow key={p.id} page={p} type="seo" />)}
+                {seoPages.map((p) => <PageRow key={p.id} page={p} type="seo" />)}
               </div>
             </div>
           </div>
@@ -658,7 +783,7 @@ const handleSaveRecs = async () => {
                 { label: "Score Lighthouse moy.", value: avgLH !== null ? `${avgLH}/100` : "—", color: scoreColor(avgLH), bg: scoreColor(avgLH) + "20" },
                 { label: "Pages analysées",       value: perfPages.length,        color: "#16a34a", bg: "#dcfce7" },
                 { label: "Total anomalies perf.", value: allPerfAnomalies.length, color: "#dc2626", bg: "#fee2e2" },
-              ].map(({ label, value, color, bg }) => (
+              ].map(({ label, value, color }) => (
                 <div key={label} className="rounded-2xl p-5 bg-white flex items-center gap-4"
                   style={{ border: "1px solid #d1fae5" }}>
                   <div>
@@ -675,13 +800,15 @@ const handleSaveRecs = async () => {
               </div>
               <div className="p-4 flex flex-col gap-2">
                 {pages
-                  .filter((p: any) => p.performanceResult)
-                  .sort((a: any, b: any) =>
-                    (a.performanceResult.metrics?.lighthouse_score || 0) -
-                    (b.performanceResult.metrics?.lighthouse_score || 0)
+                  .filter((p) => p.performanceResult)
+                  .sort(
+                    (a,b) =>
+                    (a.performanceResult?.metrics?.lighthouse_score ?? 0) -
+                    (b.performanceResult?.metrics?.lighthouse_score ?? 0)
                   )
-                  .map((p: any) => <PageRow key={p.id} page={p} type="performance" />)
-                }
+                  .map((p) => (
+                  <PageRow key={p.id} page={p} type="performance" />)
+                )}
               </div>
             </div>
           </div>
@@ -706,8 +833,8 @@ const handleSaveRecs = async () => {
                     {[
                       { label: "Statut",        value: security.sslValid ? "✓ Valide" : "✗ Invalide", color: security.sslValid ? "#16a34a" : "#dc2626" },
                       { label: "Émetteur",       value: security.sslIssuer || "—",                     color: "#374151" },
-                      { label: "Expiration",     value: security.sslExpiry || "—",                     color: security.sslDaysRemaining < 30 ? "#ca8a04" : "#374151" },
-                      { label: "Jours restants", value: security.sslDaysRemaining != null ? `${security.sslDaysRemaining} jours` : "—", color: security.sslDaysRemaining < 30 ? "#ca8a04" : "#16a34a" },
+                      { label: "Expiration", value: security.sslExpiry || "—", color: security.sslDaysRemaining != null && security.sslDaysRemaining < 30 ? "#ca8a04" : "#374151" },
+                      { label: "Jours restants", value: security.sslDaysRemaining != null ? `${security.sslDaysRemaining} jours` : "—", color: security.sslDaysRemaining != null && security.sslDaysRemaining < 30 ? "#ca8a04" : "#16a34a" },
                     ].map(({ label, value, color }) => (
                       <div key={label} className="rounded-xl p-4" style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>
                         <p style={{ fontSize: "11px", color: "#9ca3af", marginBottom: "4px" }}>{label}</p>
@@ -722,13 +849,13 @@ const handleSaveRecs = async () => {
                     <h3 style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "15px", color: "#14532d" }}>Headers de sécurité</h3>
                   </div>
                   <div className="p-6 flex flex-col gap-3">
-                    {security.missingHeaders?.length > 0 && (
+                    {(security.missingHeaders?.length ?? 0) > 0 && (
                       <div>
                         <p style={{ fontSize: "13px", fontWeight: 600, color: "#dc2626", marginBottom: "8px" }}>
-                          ✗ Headers manquants ({security.missingHeaders.length})
+                          ✗ Headers manquants ({security.missingHeaders?.length ?? 0})
                         </p>
                         <div className="flex flex-col gap-2">
-                          {security.missingHeaders.map((h: string) => (
+                          {(security.missingHeaders ?? []).map((h: string) => (
                             <div key={h} className="flex items-center gap-3 px-4 py-2.5 rounded-xl"
                               style={{ background: "#fee2e2", border: "1px solid #fecaca" }}>
                               <XCircle size={14} style={{ color: "#dc2626", flexShrink: 0 }} />
@@ -738,13 +865,13 @@ const handleSaveRecs = async () => {
                         </div>
                       </div>
                     )}
-                    {security.presentHeaders?.length > 0 && (
+                    {(security.presentHeaders?.length ?? 0) > 0 && (
                       <div>
                         <p style={{ fontSize: "13px", fontWeight: 600, color: "#16a34a", marginBottom: "8px" }}>
-                          ✓ Headers présents ({security.presentHeaders.length})
+                          ✓ Headers présents ({security.presentHeaders?.length ?? 0})
                         </p>
                         <div className="flex flex-col gap-2">
-                          {security.presentHeaders.map((h: string) => (
+                          {(security.presentHeaders ?? []).map((h: string) => (
                             <div key={h} className="flex items-center gap-3 px-4 py-2.5 rounded-xl"
                               style={{ background: "#dcfce7", border: "1px solid #bbf7d0" }}>
                               <CheckCircle2 size={14} style={{ color: "#16a34a", flexShrink: 0 }} />
@@ -757,15 +884,15 @@ const handleSaveRecs = async () => {
                   </div>
                 </div>
 
-                {security.anomalies?.length > 0 && (
+                {(security.anomalies?.length ?? 0) > 0 && (
                   <div className="rounded-2xl bg-white overflow-auto" style={{ border: "1px solid #d1fae5" }}>
                     <div className="px-6 py-4 border-b" style={{ borderColor: "#f0fdf4" }}>
                       <h3 style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "15px", color: "#14532d" }}>
-                        Anomalies détectées ({security.anomalies.length})
+                        Anomalies détectées ({security.anomalies?.length ?? 0})
                       </h3>
                     </div>
                     <div className="p-4 flex flex-col gap-2">
-                      {security.anomalies.map((a: any, i: number) => (
+                      {(security.anomalies ?? []).map((a, i) => (
                         <div key={i} className="flex items-start gap-3 px-4 py-3 rounded-xl"
                           style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>
                           <AnomalyBadge type={a.type} map={SEC_TYPE_MAP} />
@@ -807,7 +934,11 @@ const handleSaveRecs = async () => {
                         </button>
                         {!editingRecs ? (
                           <button
-                            onClick={() => { setRecsText(renderRecsText(audit.recommendations)); setEditingRecs(true); }}
+                            onClick={() => {
+  if (!audit.recommendations) return;
+  setRecsText(renderRecsText(audit.recommendations));
+  setEditingRecs(true);
+}}
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:opacity-80"
                             style={{ background: "#f3f4f6", color: "#6b7280", border: "1px solid #e5e7eb" }}>
                             ✏️ Modifier

@@ -1,3 +1,4 @@
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import NewAuditPage from "@/app/dashboard/new/page";
@@ -37,8 +38,9 @@ describe("Nouvel audit page", () => {
       screen.getByRole("heading", { name: "Nouvel audit" }),
     ).toBeInTheDocument();
 
-    expect(screen.getByPlaceholderText("https://exemple.com"))
-      .toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText("https://exemple.com"),
+    ).toBeInTheDocument();
 
     expect(screen.getByRole("combobox")).toBeInTheDocument();
 
@@ -58,7 +60,9 @@ describe("Nouvel audit page", () => {
       screen.getByPlaceholderText("https://exemple.com"),
     ).toBeInTheDocument();
 
-    expect(screen.queryByText("Analyses techniques")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Analyses techniques"),
+    ).not.toBeInTheDocument();
   });
 
   it("rejects a malformed URL", () => {
@@ -74,8 +78,11 @@ describe("Nouvel audit page", () => {
       screen.getByText("URL invalide (ex: https://exemple.com)"),
     ).toBeInTheDocument();
 
-    expect(screen.queryByText("Analyses techniques")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Analyses techniques"),
+    ).not.toBeInTheDocument();
   });
+
 
   it("advances to the analysis step when the URL is valid", () => {
     render(<NewAuditPage />);

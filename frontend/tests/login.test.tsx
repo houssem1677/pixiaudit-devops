@@ -1,8 +1,8 @@
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import LoginPage from "@/app/(auth)/login/page";
-import api from "@/lib/axios";
 
 const { mockPush, mockPost } = vi.hoisted(() => ({
   mockPush: vi.fn(),
@@ -15,6 +15,7 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("next/image", () => ({
   default: (props: React.ImgHTMLAttributes<HTMLImageElement>) => (
+    // eslint-disable-next-line @next/next/no-img-element
     <img {...props} alt={props.alt ?? ""} />
   ),
 }));
@@ -70,10 +71,12 @@ describe("LoginPage", () => {
       screen.getByPlaceholderText("vous@exemple.com"),
       "not-an-email",
     );
+
     await user.type(
       screen.getByPlaceholderText("••••••••"),
       "password123",
     );
+
     await user.click(screen.getByRole("button", { name: "Se connecter" }));
 
     expect(
@@ -91,7 +94,12 @@ describe("LoginPage", () => {
       screen.getByPlaceholderText("vous@exemple.com"),
       "user@example.com",
     );
-    await user.type(screen.getByPlaceholderText("••••••••"), "short");
+
+    await user.type(
+      screen.getByPlaceholderText("••••••••"),
+      "short",
+    );
+
     await user.click(screen.getByRole("button", { name: "Se connecter" }));
 
     expect(
@@ -138,10 +146,12 @@ describe("LoginPage", () => {
       screen.getByPlaceholderText("vous@exemple.com"),
       "user@example.com",
     );
+
     await user.type(
       screen.getByPlaceholderText("••••••••"),
       "password123",
     );
+
     await user.click(screen.getByRole("button", { name: "Se connecter" }));
 
     await waitFor(() => {
@@ -149,6 +159,7 @@ describe("LoginPage", () => {
         email: "user@example.com",
         password: "password123",
       });
+
       expect(mockPush).toHaveBeenCalledWith("/dashboard/new");
     });
 
@@ -160,6 +171,7 @@ describe("LoginPage", () => {
 
   it("displays an error when login fails", async () => {
     const user = userEvent.setup();
+
     mockPost.mockRejectedValueOnce(new Error("Invalid credentials"));
 
     render(<LoginPage />);
@@ -168,10 +180,12 @@ describe("LoginPage", () => {
       screen.getByPlaceholderText("vous@exemple.com"),
       "user@example.com",
     );
+
     await user.type(
       screen.getByPlaceholderText("••••••••"),
       "password123",
     );
+
     await user.click(screen.getByRole("button", { name: "Se connecter" }));
 
     expect(

@@ -1,7 +1,7 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 // ── Create audit ──────────────────────────────────────────────────────────
-export async function createAudit(url: string, config?: Record<string, any>) {
+export async function createAudit(url: string, config?: Record<string, unknown>) {
   const response = await fetch(`${API_URL}/audit`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },

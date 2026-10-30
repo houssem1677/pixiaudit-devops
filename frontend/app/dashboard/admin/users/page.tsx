@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect , useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   UserPlus, 
@@ -17,7 +17,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card , CardContent } from '@/components/ui/card';
 
 interface User {
   id: string;
@@ -44,6 +44,18 @@ interface Audit {
   status: string;
 }
 
+interface RecommendationHistory {
+  id: number;
+  version: number;
+  changeType: string;
+  modifiedBy?: {
+    prenom: string;
+    nom: string;
+  } | null;
+  createdAt: string;
+  recommendations: string;
+}
+
 export default function AdminUsersPage() {
   const router = useRouter();
   const [users, setUsers] = useState<User[]>([]);
@@ -63,7 +75,7 @@ export default function AdminUsersPage() {
 
   const [showRecoModal, setShowRecoModal] = useState(false);
   const [selectedAudit, setSelectedAudit] = useState<Audit | null>(null);
-  const [recommendationHistory, setRecommendationHistory] = useState<any[]>([]);
+  const [recommendationHistory, setRecommendationHistory] = useState<RecommendationHistory[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
   // ADMIN PAGE GUARD - Check if user is admin
@@ -78,15 +90,15 @@ export default function AdminUsersPage() {
     }
   }, [router]);
 
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem("access_token");
-    return {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    };
+  const getAuthHeaders = useCallback(() => {
+  const token = localStorage.getItem("access_token");
+  return {
+    Authorization: `Bearer ${token}`,
+    "Content-Type": "application/json",
   };
+}, []);
 
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     if (!isAuthorized) return;
     try {
       const res = await fetch('http://localhost:3001/users/stats', {
@@ -99,9 +111,9 @@ export default function AdminUsersPage() {
     } catch (error) {
       console.error('Failed to fetch stats:', error);
     }
-  };
+  }, [isAuthorized, getAuthHeaders]);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     if (!isAuthorized) return;
     setLoading(true);
     try {
@@ -144,19 +156,19 @@ export default function AdminUsersPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [isAuthorized, page, search, router, getAuthHeaders]);
 
   useEffect(() => {
     if (isAuthorized) {
       fetchStats();
     }
-  }, [isAuthorized]);
+  }, [isAuthorized, fetchStats]);
 
   useEffect(() => {
     if (isAuthorized) {
       fetchUsers();
     }
-  }, [page, search, isAuthorized]);
+  }, [page, search, isAuthorized, fetchUsers]);
 
   const handleDelete = async (userId: string) => {
     if (!confirm('Êtes-vous sûr de vouloir supprimer cet utilisateur ?')) {
@@ -541,13 +553,13 @@ function CreateUserModal({ onClose, onSuccess }: { onClose: () => void; onSucces
   });
   const [loading, setLoading] = useState(false);
 
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem("access_token");
-    return {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    };
+const getAuthHeaders = useCallback(() => {
+  const token = localStorage.getItem("access_token");
+  return {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json',
   };
+}, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -622,7 +634,21 @@ function CreateUserModal({ onClose, onSuccess }: { onClose: () => void; onSucces
 }
 
 // Audits Modal – shows all audits for a specific user
-function AuditsModal({ user, audits, loading, onClose, onAuditClick }: any) {
+interface AuditsModalProps {
+  user: User;
+  audits: Audit[];
+  loading: boolean;
+  onClose: () => void;
+  onAuditClick: (audit: Audit) => void;
+}
+
+function AuditsModal({
+  user,
+  audits,
+  loading,
+  onClose,
+  onAuditClick,
+}: AuditsModalProps) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[80vh] flex flex-col">
@@ -643,7 +669,7 @@ function AuditsModal({ user, audits, loading, onClose, onAuditClick }: any) {
             <p className="text-center text-gray-500 py-8">Aucun audit trouvé</p>
           ) : (
             <div className="space-y-3">
-              {audits.map((audit: any) => (
+              {audits.map((audit) => (
                 <div
                   key={audit.id}
                   onClick={() => onAuditClick(audit)}
@@ -674,27 +700,45 @@ function AuditsModal({ user, audits, loading, onClose, onAuditClick }: any) {
 }
 
 // Recommendation History Modal – with collapsible versions
-function RecommendationHistoryModal({ audit, history, loading, onClose }: any) {
-  const [expandedVersions, setExpandedVersions] = useState<Set<number>>(new Set());
+interface RecommendationHistoryModalProps {
+  audit: Audit;
+  history: RecommendationHistory[];
+  loading: boolean;
+  onClose: () => void;
+}
 
-  const toggleVersion = (version: number) => {
-    setExpandedVersions((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(version)) {
-        newSet.delete(version);
-      } else {
-        newSet.add(version);
-      }
-      return newSet;
-    });
-  };
+function RecommendationHistoryModal({
+  audit,
+  history,
+  loading,
+  onClose,
+}: RecommendationHistoryModalProps) {
+  const [expandedVersions, setExpandedVersions] = useState<Set<number> | null>(null);
 
-  useEffect(() => {
-    if (history.length > 0 && expandedVersions.size === 0) {
-      const latestVersion = Math.max(...history.map((item: any) => item.version));
-      setExpandedVersions(new Set([latestVersion]));
+const latestVersion =
+  history.length > 0
+    ? Math.max(...history.map((item) => item.version))
+    : null;
+
+const toggleVersion = (version: number) => {
+  setExpandedVersions((current) => {
+    const next = new Set(
+      current ?? (latestVersion !== null ? [latestVersion] : [])
+    );
+
+    if (next.has(version)) {
+      next.delete(version);
+    } else {
+      next.add(version);
     }
-  }, [history]);
+
+    return next;
+  });
+};
+
+
+
+
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -720,8 +764,11 @@ function RecommendationHistoryModal({ audit, history, loading, onClose }: any) {
             <p className="text-center text-gray-500 py-8">Aucun historique trouvé</p>
           ) : (
             <div className="space-y-3">
-              {history.map((item: any) => {
-                const isExpanded = expandedVersions.has(item.version);
+              {history.map((item) => {
+                const isExpanded =
+                  expandedVersions === null
+                    ? item.version === latestVersion
+                    : expandedVersions.has(item.version);
                 return (
                   <div key={item.id} className="border border-gray-200 rounded-lg overflow-hidden">
                     <button
