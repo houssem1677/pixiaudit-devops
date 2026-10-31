@@ -465,8 +465,10 @@ export default function NewAuditPage() {
           router.push("/login");
           return;
         }
-        const err = await res.json().catch(() => ({}));
-        throw new Error((err as any).message || "Erreur serveur.");
+        const err = (await res.json().catch(() => ({}))) as {
+          message?: string;
+        };
+        throw new Error(err.message || "Erreur serveur.");
       }
 
       // Redirect to audits page on success
@@ -487,7 +489,7 @@ export default function NewAuditPage() {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">Nouvel audit</h1>
-          <p className="text-sm md:text-base text-gray-500">Configurez et lancez l'analyse de votre site</p>
+          <p className="text-sm md:text-base text-gray-500">Configurez et lancez l&apos;analyse de votre site</p>
         </div>
 
         <StepBar current={step} />
@@ -884,7 +886,7 @@ export default function NewAuditPage() {
                         Suit les règles définies dans le fichier <code className="text-xs bg-gray-200 px-1 py-0.5 rounded">robots.txt</code> du site
                       </p>
                       <p className="text-xs text-gray-400 mt-1">
-                        Désactivez cette option pour forcer l'exploration des pages normalement interdites
+                        Désactivez cette option pour forcer l&apos;exploration des pages normalement interdites
                       </p>
                     </div>
                     <div className="ml-4">
@@ -901,14 +903,14 @@ export default function NewAuditPage() {
                   <span className="text-xl">🔐</span> Authentification
                 </CardTitle>
                 <p className="text-sm text-gray-500 mt-1">
-                  Configurez l'accès à un site protégé par mot de passe
+                  Configurez l&apos;accès à un site protégé par mot de passe
                 </p>
               </CardHeader>
 
               <CardContent className="space-y-5">
                 <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100">
                   <div>
-                    <p className="text-sm font-medium text-gray-900">Activer l'authentification</p>
+                    <p className="text-sm font-medium text-gray-900">Activer 	l&apos;authentification</p>
                     <p className="text-xs text-gray-500">Activez si votre site nécessite une connexion</p>
                   </div>
                   <Toggle value={hasAuth} onChange={setHasAuth} />
@@ -928,14 +930,14 @@ export default function NewAuditPage() {
                           className="h-11"
                         />
                         <p className="text-xs text-gray-400 mt-1">
-                          L'URL où se trouve le formulaire de connexion
+                          L&apos;URL où se trouve le formulaire de connexion
                         </p>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <Label className="text-sm font-medium text-gray-700 block mb-1.5">
-                            Nom d'utilisateur
+                            Nom d&apos;utilisateur
                           </Label>
                           <Input
                             placeholder="admin@exemple.com"
@@ -985,9 +987,9 @@ export default function NewAuditPage() {
               <CardHeader className="pb-4 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle className="text-xl font-bold text-gray-900">Récapitulatif de l'audit</CardTitle>
+                    <CardTitle className="text-xl font-bold text-gray-900">Récapitulatif de l&apos;audit</CardTitle>
                     <p className="text-sm text-gray-500 mt-1">
-                      Vérifiez l'ensemble des paramètres avant de lancer l'analyse
+                      Vérifiez l&apos;ensemble des paramètres avant de lancer l&apos;analyse
                     </p>
                   </div>
                   <div className="hidden sm:block">
@@ -1077,7 +1079,7 @@ export default function NewAuditPage() {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm font-medium text-gray-900">Respect robots.txt</p>
-                        <p className="text-xs text-gray-500">Suit les règles d'exploration du site</p>
+                        <p className="text-xs text-gray-500"> Suit les règles d&apos;exploration du site</p>
                       </div>
                       <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${respectRobots ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                         {respectRobots ? "Activé" : "Désactivé"}
@@ -1186,7 +1188,7 @@ export default function NewAuditPage() {
                     <div>
                       <p className="text-sm font-medium text-yellow-800">Respect robots.txt désactivé</p>
                       <p className="text-xs text-yellow-700 mt-0.5">
-                        L'exploration ignorera les règles du site, ce qui peut surcharger le serveur
+                        l&apos;exploration ignorera les règles du site, ce qui peut surcharger le serveur
                       </p>
                     </div>
                   </div>
@@ -1198,7 +1200,7 @@ export default function NewAuditPage() {
                     <div>
                       <p className="text-sm font-medium text-orange-800">Authentification activée sans URL</p>
                       <p className="text-xs text-orange-700 mt-0.5">
-                        Veuillez renseigner l'URL de connexion pour que l'audit puisse accéder au site
+                        Veuillez renseigner l&apos;URL de connexion pour que l&apos;audit puisse accéder au site
                       </p>
                     </div>
                   </div>
@@ -1222,7 +1224,7 @@ export default function NewAuditPage() {
                 disabled={launching}
                 className="flex-1 h-11 bg-[#79C300] text-white rounded-lg font-medium shadow-sm cursor-pointer hover:bg-[#6aad00] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {launching ? "Lancement..." : "Lancer l'audit"}
+                {launching ? "Lancement..." : "Lancer l&apos;audit"}
               </button>
             </div>
           </div>

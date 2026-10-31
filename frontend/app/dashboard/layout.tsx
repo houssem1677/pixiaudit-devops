@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -21,33 +22,40 @@ const NAV = [
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
-  const [userName, setUserName] = useState("...");
-  const [userInitial, setUserInitial] = useState("?");
-  const [userRole, setUserRole] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState<{
+  name: string;
+  initial: string;
+  role: string;
+} | null>(null);
+
+const [isLoading, setIsLoading] = useState(true);
 
   const pathname = usePathname();
   const router = useRouter();
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    const timer = window.setTimeout(() => {
+      const token = localStorage.getItem("access_token");
 
-    const token = localStorage.getItem("access_token");
+      if (!token) {
+        router.replace("/login");
+        return;
+      }
 
-    if (!token) {
-      router.replace("/login");
-      return;
-    }
+      const name = localStorage.getItem("user_name") || "Utilisateur";
+      const role = localStorage.getItem("user_role") || "USER";
 
-    const name = localStorage.getItem("user_name") || "Utilisateur";
-    const role = localStorage.getItem("user_role") || "USER";
+      setUser({
+        name: name.split(" ")[0],
+        initial: name.charAt(0).toUpperCase(),
+        role,
+      });
 
-    setUserName(name.split(" ")[0]);
-    setUserInitial(name.charAt(0).toUpperCase());
-    setUserRole(role);
-    setIsLoading(false);
-  }, [router]);
+      setIsLoading(false);
+    }, 0);
 
+    return () => window.clearTimeout(timer);
+  }, [router, setUser, setIsLoading]);
   const handleLogout = () => {
     if (typeof window !== "undefined") {
       localStorage.removeItem("access_token");
@@ -84,12 +92,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           className="flex items-center gap-3 px-5 py-5 border-b"
           style={{ borderColor: "#d1fae5", height: "72px" }}
         >
-          <img
-            src="/logo.jpg"
-            alt="PixiAudit Logo"
-            className="flex-shrink-0"
-            style={{ width: "36px", height: "36px", objectFit: "contain" }}
-          />
+          <Image
+  src="/logo.jpg"
+  alt="PixiAudit Logo"
+  width={36}
+  height={36}
+  className="flex-shrink-0"
+  style={{ objectFit: "contain" }}
+/>
           {!collapsed && (
             <span
               style={{
@@ -125,7 +135,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Nav */}
         <nav className="flex-1 px-3 py-4 flex flex-col gap-1">
           {NAV.map(({ icon: Icon, label, href, adminOnly }) => {
-            if (adminOnly && userRole !== "ADMIN") return null;
+            if (adminOnly && user?.role !== "ADMIN") return null;
             
             const active = pathname === href || (href !== "/dashboard" && pathname?.startsWith(href));
             return (
@@ -180,11 +190,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold text-white"
               style={{ background: "linear-gradient(135deg,#16a34a,#15803d)" }}
             >
-              {userInitial}
+              {user?.initial}
             </div>
             {!collapsed && (
               <div className="flex-1 min-w-0 text-left">
-                <p style={{ fontSize: "13px", fontWeight: 600, color: "#14532d", lineHeight: 1.2 }}>{userName}</p>
+                <p style={{ fontSize: "13px", fontWeight: 600, color: "#14532d", lineHeight: 1.2 }}>{user?.name}</p>
                 <p style={{ fontSize: "11px", color: "#6b7280", lineHeight: 1.2 }}>PixiMind</p>
               </div>
             )}
@@ -201,7 +211,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         >
           <div>
             <h1 style={{ fontFamily: "'Syne', sans-serif", fontSize: "20px", fontWeight: 900, color: "#14532d" }}>
-              Bienvenue, {userName}
+              Bienvenue, {user?.name}
             </h1>
           </div>
           <div />

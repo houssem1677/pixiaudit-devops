@@ -6,11 +6,10 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Eye, EyeOff, Loader2, Check, Shield } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent } from "@/components/ui/card";
 import Image from "next/image";
 import api from "@/lib/axios";
 
@@ -111,7 +110,7 @@ export default function LoginPage() {
           <div className="relative z-10">
             <div className="inline-flex items-center gap-2 bg-[#79C300]/15 border border-[#79C300]/30 rounded-full px-4 py-1.5 mb-6">
               <div className="w-2 h-2 rounded-full bg-[#79C300] animate-pulse" />
-              <span className="text-[#79C300] text-xs font-medium">Plateforme d'audit automatisé</span>
+              <span className="text-[#79C300] text-xs font-medium">Plateforme d&apos;audit automatisé</span>
             </div>
             <h2 className="text-3xl font-bold text-white leading-tight mb-4">
               Analysez vos sites web<br />
@@ -159,7 +158,7 @@ export default function LoginPage() {
                 Connexion
               </h1>
               <p className="text-sm text-gray-500">
-                Accédez à votre espace d'audit PixiAudit
+                Accédez à votre espace d&apos;audit PixiAudit
               </p>
             </div>
 

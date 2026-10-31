@@ -23,6 +23,16 @@ const FILTER_LABELS: Record<string, string> = {
   "failed": "Échoué",
 };
 
+interface Audit {
+  id: string | number;
+  jobId: string;
+  url: string;
+  status: string;
+  createdAt: string | null;
+  pagesCrawled: number;
+  globalScore: number | null;
+}
+
 function ScoreRing({ score }: { score: number | null }) {
   if (!score) return <div style={{ width: 46 }} />;
   const r = 18, circ = 2 * Math.PI * r;
@@ -71,7 +81,7 @@ function getDomain(url: string) {
 
 export default function MesAuditsPage() {
   const router = useRouter();
-  const [audits, setAudits]         = useState<any[]>([]);
+  const [audits, setAudits]         = useState<Audit[]>([]);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState("");
   const [search, setSearch]         = useState("");

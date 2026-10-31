@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -89,11 +89,9 @@ export default function SettingsPage() {
     };
   };
 
-  useEffect(() => {
-    loadSettings();
-  }, []);
 
-  async function loadSettings() {
+
+  const loadSettings = useCallback(async () => {
     try {
       setIsLoading(true);
       
@@ -140,8 +138,11 @@ export default function SettingsPage() {
     } finally {
       setIsLoading(false);
     }
-  }
+  }, []);
 
+  useEffect(() => {
+    loadSettings();
+  }, [loadSettings]);
   function getDefaultLevel(key: string): AnomalyLevel {
     const critiqueList = ["H1_MISSING", "META_MISSING", "TITLE_MISSING", "HIGH_TTFB", "HIGH_LCP", "RENDER_BLOCKING_SCRIPTS", "MISSING_HEADER", "SSL_INVALID"];
     const importantList = ["TITLE_TOO_SHORT", "TITLE_TOO_LONG", "META_TOO_SHORT", "META_TOO_LONG", "HIGH_CLS", "IMAGES_WITHOUT_LAZY_LOADING", "IMAGES_WITHOUT_DIMENSIONS", "SSL_EXPIRING_SOON"];
@@ -167,7 +168,7 @@ export default function SettingsPage() {
     otherKeys.forEach(key => {
       const proportion = weights[key] / otherTotal;
       const adjustment = diff * proportion;
-      let newOtherValue = Math.max(0, Math.min(100, Math.round(weights[key] - adjustment)));
+      const newOtherValue = Math.max(0, Math.min(100, Math.round(weights[key] - adjustment)));
       newWeights[key] = newOtherValue;
     });
 
@@ -236,9 +237,14 @@ export default function SettingsPage() {
       }
 
       toast.success("Paramètres sauvegardés !");
-    } catch (error: any) {
+        } catch (error: unknown) {
       console.error("Error:", error);
-      toast.error("Erreur", { description: error.message });
+      toast.error("Erreur", {
+        description:
+          error instanceof Error
+            ? error.message
+            : "Une erreur inconnue est survenue.",
+      });
     } finally {
       setIsSaving(false);
     }
