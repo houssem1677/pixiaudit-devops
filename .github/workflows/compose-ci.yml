@@ -168,3 +168,129 @@ jobs:
           rm -f secrets/ci_postgres_password.txt \
                 secrets/ci_jwt_secret.txt \
                 secrets/ci_smtp_password.txt
+
+  detect-changes:
+    name: Detect production image changes
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.changes.outputs.services }}
+
+    steps:
+      - name: Checkout full Git history
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Detect affected services
+        id: changes
+        env:
+          BEFORE: ${{ github.event.before }}
+          CURRENT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "$BEFORE" || "$BEFORE" =~ ^0+$ ]]; then
+            echo "No valid previous commit; checking all production services."
+            changed_files="$(git ls-tree -r --name-only "$CURRENT")"
+          else
+            changed_files="$(git diff --name-only "$BEFORE" "$CURRENT")"
+          fi
+
+          services=()
+
+          add_service() {
+            local service="$1"
+
+            for existing in "${services[@]}"; do
+              if [[ "$existing" == "$service" ]]; then
+                return
+              fi
+            done
+
+            services+=("$service")
+          }
+
+          while IFS= read -r file; do
+            case "$file" in
+              frontend/*)
+                add_service frontend
+                ;;
+              backend/*)
+                add_service backend
+                ;;
+              scraper/*)
+                add_service scraper
+                ;;
+              ai-service/*)
+                add_service ai-service
+                ;;
+              lighthouse/*)
+                add_service lighthouse
+                add_service scraper
+                ;;
+            esac
+          done <<< "$changed_files"
+
+          services_json="$(python3 -c \
+            'import json,sys; print(json.dumps(sys.argv[1:]))' \
+            "${services[@]}")"
+
+          echo "Affected services: $services_json"
+          echo "services=$services_json" >> "$GITHUB_OUTPUT"
+
+  publish:
+    name: Publish ${{ matrix.service }}
+    needs:
+      - compose-integration
+      - detect-changes
+    if: >-
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      needs.compose-integration.result == 'success' &&
+      needs.detect-changes.result == 'success' &&
+      needs.detect-changes.outputs.services != '[]'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJSON(needs.detect-changes.outputs.services) }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/houssem1677/pixiaudit-${{ matrix.service }}
+          tags: |
+            type=raw,value=latest
+            type=sha,format=long
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./${{ matrix.service }}
+          file: ./${{ matrix.service }}/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
