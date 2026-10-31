@@ -1,0 +1,170 @@
+name: PixiAudit Compose CI
+
+on:
+  push:
+    paths:
+      - "frontend/**"
+      - "backend/**"
+      - "scraper/**"
+      - "ai-service/**"
+      - "lighthouse/**"
+      - "ci-mocks/**"
+      - "docker-compose.yml"
+      - "docker-compose.ci.yml"
+      - ".github/workflows/compose-ci.yml"
+
+  pull_request:
+    paths:
+      - "frontend/**"
+      - "backend/**"
+      - "scraper/**"
+      - "ai-service/**"
+      - "lighthouse/**"
+      - "ci-mocks/**"
+      - "docker-compose.yml"
+      - "docker-compose.ci.yml"
+      - ".github/workflows/compose-ci.yml"
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: compose-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compose-integration:
+    name: Build and test complete application
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Check Docker Compose
+        run: docker compose version
+
+      - name: Create temporary CI secrets
+        run: |
+          mkdir -p secrets
+          printf '%s' 'ci-postgres-password-only' > secrets/ci_postgres_password.txt
+          printf '%s' 'ci-jwt-secret-only-for-testing' > secrets/ci_jwt_secret.txt
+          printf '%s' 'ci-smtp-password-only-for-testing' > secrets/ci_smtp_password.txt
+
+      - name: Validate Compose configuration
+        run: |
+          docker compose \
+            -f docker-compose.yml \
+            -f docker-compose.ci.yml \
+            config --quiet
+
+      - name: Build application and mock images
+        run: |
+          docker compose \
+            -f docker-compose.yml \
+            -f docker-compose.ci.yml \
+            build
+
+      - name: Start complete CI stack
+        run: |
+          docker compose \
+            -f docker-compose.yml \
+            -f docker-compose.ci.yml \
+            up -d --wait --wait-timeout 180
+
+      - name: Test frontend and backend
+        run: |
+          curl --fail --silent --show-error http://127.0.0.1:3000/login
+          curl --fail --silent --show-error http://127.0.0.1:3001/health
+
+      - name: Test scraper and Lighthouse integration
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml \
+            exec -T scraper python -c '
+          import json
+          import urllib.request
+
+          health = urllib.request.urlopen(
+              "http://127.0.0.1:8002/health", timeout=5
+          )
+          assert health.status == 200
+
+          payload = {
+              "url": "https://example.com",
+              "strategy": "desktop"
+          }
+
+          request = urllib.request.Request(
+              "http://lighthouse:8003/audit",
+              data=json.dumps(payload).encode(),
+              headers={"Content-Type": "application/json"},
+              method="POST"
+          )
+
+          with urllib.request.urlopen(request, timeout=10) as response:
+              result = json.loads(response.read())
+
+          assert result["categories"]["performance"]["score"] == 0.90
+          print("Scraper and Lighthouse mock integration passed.")
+          '
+
+      - name: Test AI service and Ollama integration
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml \
+            exec -T ai-service python -c '
+          import json
+          import urllib.request
+
+          health = urllib.request.urlopen(
+              "http://127.0.0.1:8000/health", timeout=5
+          )
+          assert health.status == 200
+
+          payload = {
+              "job_id": "compose-ci-test",
+              "url": "https://example.com",
+              "global_score": 90,
+              "seo_anomalies": [],
+              "perf_anomalies": [],
+              "sec_anomalies": [],
+              "analyses": ["performance"]
+          }
+
+          request = urllib.request.Request(
+              "http://127.0.0.1:8000/recommendations",
+              data=json.dumps(payload).encode(),
+              headers={"Content-Type": "application/json"},
+              method="POST"
+          )
+
+          with urllib.request.urlopen(request, timeout=15) as response:
+              result = json.loads(response.read())
+
+          assert result["job_id"] == "compose-ci-test"
+          assert result["recommendations"]
+          assert "metrics" in result
+
+          print("AI service and Ollama mock integration passed.")
+          '
+
+      - name: Display container status
+        if: always()
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml ps
+
+      - name: Collect logs on failure
+        if: failure()
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml \
+            logs --no-color --tail=200
+
+      - name: Stop stack and remove temporary data
+        if: always()
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml \
+            down --volumes --remove-orphans
+          rm -f secrets/ci_postgres_password.txt \
+                secrets/ci_jwt_secret.txt \
+                secrets/ci_smtp_password.txt
