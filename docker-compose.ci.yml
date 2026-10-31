@@ -1,0 +1,63 @@
+services:
+  # Never start the real Mistral initializer in CI.
+  model-init:
+    profiles:
+      - production
+
+  # Replace real Ollama with the lightweight CI mock.
+  ollama:
+    image: pixiaudit-ollama-mock:ci
+    build: ./ci-mocks/ollama
+    volumes: !override []
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:11434/', timeout=2)"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 2s
+
+  # Remove model-init dependency; wait directly for mock Ollama.
+  ai-service:
+    depends_on: !override
+      ollama:
+        condition: service_healthy
+
+  # Replace Chrome and real Lighthouse with the CI mock.
+  lighthouse:
+    image: pixiaudit-lighthouse-mock:ci
+    build: ./ci-mocks/lighthouse
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8003/health', timeout=2)"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 2s
+
+  # Use isolated dummy credentials for CI.
+  postgres:
+    environment:
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+
+  backend:
+    environment:
+      DATABASE_PASSWORD_FILE: /run/secrets/postgres_password
+      JWT_SECRET_FILE: /run/secrets/jwt_secret
+      SMTP_PASSWORD_FILE: /run/secrets/smtp_password
+      SMTP_USER: ci@example.test
+      SMTP_FROM: ci@example.test
+
+secrets:
+  postgres_password:
+    file: ./secrets/ci_postgres_password.txt
+  jwt_secret:
+    file: ./secrets/ci_jwt_secret.txt
+  smtp_password:
+    file: ./secrets/ci_smtp_password.txt
