@@ -12,6 +12,10 @@ on:
       - ".github/workflows/frontend-ci.yml"
   workflow_dispatch:
 
+concurrency:
+  group: frontend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test-and-build:
     name: Test and build frontend
@@ -34,14 +38,17 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-      # Restore Next.js build artifacts to speed up subsequent builds
+
       - name: Cache Next.js build
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: frontend/.next/cache
-          key: nextjs-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}-${{ github.sha }}
+          key: nextjs-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
           restore-keys: |
             nextjs-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}-
+
+      - name: Run ESLint
+        run: npm run lint
 
       - name: Run frontend tests
         run: npm test

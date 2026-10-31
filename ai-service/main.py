@@ -41,7 +41,12 @@ def format_as_paragraph(text: str) -> str:
         pass
     return text
 
-def remove_unwanted_sections(text: str, has_seo: bool, has_perf: bool, has_sec: bool) -> str:
+def remove_unwanted_sections(
+    text: str,
+    has_seo: bool,
+    has_perf: bool,
+    has_sec: bool
+) -> str:
     lines = text.split("\n")
     result = []
     skip = False
@@ -49,18 +54,23 @@ def remove_unwanted_sections(text: str, has_seo: bool, has_perf: bool, has_sec: 
     for line in lines:
         stripped = line.strip()
 
-        if stripped.startswith("### SEO") and not has_seo:
-            skip = True
-            continue
-        if stripped.startswith("### Performance") and not has_perf:
-            skip = True
-            continue
-        if (stripped.startswith("### Securite") or stripped.startswith("### Sécurité")) and not has_sec:
-            skip = True
-            continue
-        if stripped.startswith("### Conclusion"):
-            skip = False
-        if stripped.startswith("### Rapport"):
+        # Detect section headings and decide whether to keep them
+        if stripped.startswith("### SEO"):
+            skip = not has_seo
+
+        elif stripped.startswith("### Performance"):
+            skip = not has_perf
+
+        elif (
+            stripped.startswith("### Securite")
+            or stripped.startswith("### Sécurité")
+        ):
+            skip = not has_sec
+
+        elif (
+            stripped.startswith("### Conclusion")
+            or stripped.startswith("### Rapport")
+        ):
             skip = False
 
         if not skip:

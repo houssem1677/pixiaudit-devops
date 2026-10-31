@@ -1,0 +1,48 @@
+name: AI Service CI
+
+on:
+  push:
+    paths:
+      - "ai-service/**"
+      - ".github/workflows/ai-service-ci.yml"
+
+  pull_request:
+    paths:
+      - "ai-service/**"
+      - ".github/workflows/ai-service-ci.yml"
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-service-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test AI Service
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: ai-service/requirements*.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r ai-service/requirements-dev.txt
+
+      - name: Run AI service tests
+        working-directory: ai-service
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -v
