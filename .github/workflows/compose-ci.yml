@@ -169,87 +169,14 @@ jobs:
                 secrets/ci_jwt_secret.txt \
                 secrets/ci_smtp_password.txt
 
-  detect-changes:
-    name: Detect production image changes
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    outputs:
-      services: ${{ steps.changes.outputs.services }}
-
-    steps:
-      - name: Checkout full Git history
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-
-      - name: Detect affected services
-        id: changes
-        env:
-          BEFORE: ${{ github.event.before }}
-          CURRENT: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-
-          if [[ -z "$BEFORE" || "$BEFORE" =~ ^0+$ ]]; then
-            echo "No valid previous commit; checking all production services."
-            changed_files="$(git ls-tree -r --name-only "$CURRENT")"
-          else
-            changed_files="$(git diff --name-only "$BEFORE" "$CURRENT")"
-          fi
-
-          services=()
-
-          add_service() {
-            local service="$1"
-
-            for existing in "${services[@]}"; do
-              if [[ "$existing" == "$service" ]]; then
-                return
-              fi
-            done
-
-            services+=("$service")
-          }
-
-          while IFS= read -r file; do
-            case "$file" in
-              frontend/*)
-                add_service frontend
-                ;;
-              backend/*)
-                add_service backend
-                ;;
-              scraper/*)
-                add_service scraper
-                ;;
-              ai-service/*)
-                add_service ai-service
-                ;;
-              lighthouse/*)
-                add_service lighthouse
-                add_service scraper
-                ;;
-            esac
-          done <<< "$changed_files"
-
-          services_json="$(python3 -c \
-            'import json,sys; print(json.dumps(sys.argv[1:]))' \
-            "${services[@]}")"
-
-          echo "Affected services: $services_json"
-          echo "services=$services_json" >> "$GITHUB_OUTPUT"
-
   publish:
     name: Publish ${{ matrix.service }}
     needs:
       - compose-integration
-      - detect-changes
     if: >-
       github.event_name == 'push' &&
       github.ref == 'refs/heads/main' &&
-      needs.compose-integration.result == 'success' &&
-      needs.detect-changes.result == 'success' &&
-      needs.detect-changes.outputs.services != '[]'
+      needs.compose-integration.result == 'success'
     runs-on: ubuntu-latest
 
     permissions:
@@ -259,7 +186,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: ${{ fromJSON(needs.detect-changes.outputs.services) }}
+        service:
+          - frontend
+          - backend
+          - scraper
+          - ai-service
+          - lighthouse
 
     steps:
       - name: Checkout repository
