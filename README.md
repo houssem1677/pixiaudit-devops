@@ -24,7 +24,7 @@ PixiAudit follows a multi-service architecture combining Next.js, NestJS, Python
 
 ### Application architecture diagram
 
-
+```mermaid
 flowchart TB
     User["User / Browser"]
     Frontend["Frontend<br/>Next.js<br/>:3000"]
@@ -67,7 +67,7 @@ flowchart TB
     class Backend backend
     class Scraper,Lighthouse,AI processing
     class Redis,Ollama,PostgreSQL infrastructure
-
+```
 
 ### Services and responsibilities
 
@@ -90,7 +90,7 @@ flowchart TB
 4. The scraper collects website information.
 5. The Lighthouse service performs performance analysis using Chrome.
 6. The AI service processes audit information and communicates with Ollama to generate recommendations.
-7. The backend and processing services persist the relevant results in PostgreSQL.
+7. The backend persists the relevant results in PostgreSQL.
 8. The frontend displays the audit results and recommendations.
 
 ## 3. Repository Structure
@@ -124,7 +124,8 @@ pixiaudit-devops/
 ├── docker-compose.deploy.yml
 ├── deploy.sh
 ├── backup-postgres.sh
-└── README.md
+├── README.md
+└── README.fr.md
 ```
 
 ## 4. Dockerization
@@ -145,7 +146,9 @@ This approach helps reduce the final image size and keeps development dependenci
 - **AI Service:** Uses Python Slim with FastAPI and the Ollama client.
 - **Lighthouse:** Uses Node.js with Google Chrome installed for browser-based performance analysis.
 
-The scraper and Lighthouse components are maintained as separate services. They were separated because the implementation combines two different technology environments: Python for scraping and Node.js for Lighthouse. Lighthouse also requires Google Chrome, which introduces additional installation and runtime dependencies. Separating them makes each service easier to build, configure, maintain, and troubleshoot.
+The scraper and Lighthouse components are maintained as separate services. They were separated because the implementation combines two different technology environments: Python for scraping and Node.js for Lighthouse. Lighthouse also requires Google Chrome, which introduces additional installation and runtime dependencies.
+
+Separating them makes each service easier to build, configure, maintain, and troubleshoot.
 
 ### Docker Compose
 
@@ -224,7 +227,7 @@ After successful Compose integration testing, the workflow publishes the five ap
 The published images are tagged with:
 
 - `latest`
-- The corresponding Git commit SHA
+- The corresponding Git commit SHA.
 
 Publishing is restricted to successful runs associated with pushes to the `main` branch.
 
@@ -366,7 +369,7 @@ PixiAudit includes an automated PostgreSQL backup script:
 backup-postgres.sh
 ```
 
-The script creates compressed PostgreSQL custom-format dumps using `pg_dump`.
+The script creates PostgreSQL custom-format dumps using `pg_dump`.
 
 ### Backup process
 
@@ -409,7 +412,12 @@ The test covered the following tables:
 
 The test confirmed that the restored database contained the expected tables and matching row counts.
 
-For the complete backup and recovery procedure, see:
+For the complete backup and recovery procedure, see [`docs/backup-recovery.md`](docs/backup-recovery.md).
 
----
+## 10. Documentation
 
+| Document | Description |
+|---|---|
+| [`README.md`](README.md) | Main project documentation in English |
+| [`README.fr.md`](README.fr.md) | French project documentation |
+| [`docs/backup-recovery.md`](docs/backup-recovery.md) | Detailed PostgreSQL backup and recovery procedure |
