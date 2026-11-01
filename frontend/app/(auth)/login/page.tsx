@@ -118,7 +118,7 @@ export default function LoginPage() {
             </h2>
             <p className="text-white/50 text-sm leading-relaxed">
               SEO, Performance, SSL — obtenez un rapport complet
-              avec des recommandations priorisées par IA.
+              avec des recommandations priorisées par IA. TEST TEST TEST
             </p>
           </div>
 
