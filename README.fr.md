@@ -1,12 +1,5 @@
-
-<text color="secondary" size="xs">The outer Markdown code fence above is for copying the complete section. Your actual README must contain the inner Mermaid fence, not the outer fence.</text>
-
-### 2. Fix the language switcher
-
-At the top of `README.md`:
-
-```markdown
 [🇬🇧 English](README.md) | [🇫🇷 Français](README.fr.md)
+
 # PixiAudit — DevOps et Déploiement
 
 ## 1. Présentation du projet
@@ -74,7 +67,7 @@ flowchart TB
     class Backend backend
     class Scraper,Lighthouse,AI processing
     class Redis,Ollama,PostgreSQL infrastructure
-
+```
 
 ### Services et responsabilités
 
@@ -97,7 +90,7 @@ flowchart TB
 4. Le scraper collecte les informations du site web.
 5. Le service Lighthouse effectue l'analyse des performances à l'aide de Chrome.
 6. Le service IA traite les informations de l'audit et communique avec Ollama afin de générer des recommandations.
-7. Le backend et les services de traitement enregistrent les résultats correspondants dans PostgreSQL.
+7. Le backend enregistre les résultats correspondants dans PostgreSQL.
 8. Le frontend affiche les résultats de l'audit et les recommandations.
 
 ## 3. Structure du dépôt
@@ -131,7 +124,8 @@ pixiaudit-devops/
 ├── docker-compose.deploy.yml
 ├── deploy.sh
 ├── backup-postgres.sh
-└── README.md
+├── README.md
+└── README.fr.md
 ```
 
 ## 4. Conteneurisation avec Docker
@@ -375,7 +369,7 @@ PixiAudit dispose d'un script automatisé de sauvegarde PostgreSQL :
 backup-postgres.sh
 ```
 
-Ce script crée des sauvegardes PostgreSQL compressées au format personnalisé (*custom format*) à l'aide de `pg_dump`.
+Ce script crée des sauvegardes PostgreSQL au format personnalisé (*custom format*) à l'aide de `pg_dump`.
 
 ### Processus de sauvegarde
 
@@ -418,6 +412,12 @@ Le test a porté sur les tables suivantes :
 
 Le test a confirmé que la base restaurée contenait les tables attendues et que leurs nombres d'enregistrements correspondaient à ceux de la base originale.
 
-Pour consulter la procédure complète de sauvegarde et de restauration :
+Pour consulter la procédure complète de sauvegarde et de restauration, voir [`docs/backup-recovery.md`](docs/backup-recovery.md).
 
----
+## 10. Documentation
+
+| Document | Description |
+|---|---|
+| [`README.md`](README.md) | Documentation principale du projet en anglais |
+| [`README.fr.md`](README.fr.md) | Documentation du projet en français |
+| [`docs/backup-recovery.md`](docs/backup-recovery.md) | Procédure détaillée de sauvegarde et de restauration PostgreSQL |
