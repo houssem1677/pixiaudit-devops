@@ -1,3 +1,5 @@
+[🇬🇧 English](README.md) | [🇫🇷 Français](README.fr.md)
+
 # PixiAudit — DevOps et Déploiement
 
 ## 1. Présentation du projet
