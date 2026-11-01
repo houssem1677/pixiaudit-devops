@@ -24,39 +24,50 @@ PixiAudit repose sur une architecture composée de plusieurs services utilisant 
 
 ### Diagramme de l'architecture applicative
 
-```mermaid
+
 flowchart TB
     User["Utilisateur / Navigateur"]
-
-    subgraph Application["Application PixiAudit"]
-        Frontend["Frontend<br/>Next.js"]
-        Backend["Backend API<br/>NestJS"]
-    end
-
-    subgraph Processing["Services de traitement des audits"]
-        Redis[("Redis<br/>Bull Queue")]
-        Scraper["Scraper<br/>Python / FastAPI"]
-        Lighthouse["Lighthouse<br/>Node.js / Chrome"]
-        AI["Service IA<br/>Python / FastAPI"]
-        Ollama["Ollama<br/>Modèle Mistral"]
-    end
-
-    subgraph Storage["Stockage des données"]
-        PostgreSQL[("PostgreSQL")]
-    end
+    Frontend["Frontend<br/>Next.js<br/>:3000"]
+    Backend["API Backend<br/>NestJS<br/>:3001"]
+    Redis[("Redis<br/>File d'attente Bull")]
+    Scraper["Service de scraping<br/>Python FastAPI<br/>:8002"]
+    Lighthouse["Service Lighthouse<br/>Node.js + Chrome<br/>:8003"]
+    AI["Service d'analyse IA<br/>Python FastAPI<br/>:8000"]
+    Ollama["Ollama<br/>Mistral"]
+    PostgreSQL[("PostgreSQL<br/>Base de données")]
 
     User --> Frontend
-    Frontend --> Backend
-    Backend --> Redis
-    Redis --> Backend
-    Backend --> Scraper
-    Scraper --> Lighthouse
-    Backend --> AI
-    AI --> Ollama
-    Backend --> PostgreSQL
-    Scraper --> PostgreSQL
-    Backend --> Frontend
-```
+    Frontend <-->|"API REST"| Backend
+
+    Backend -->|"Mise en file d'attente du job d'audit"| Redis
+    Redis -->|"Job disponible"| Backend
+
+    Backend -->|"Tâche de scraping"| Scraper
+    Scraper -->|"Résultats du scraping"| Backend
+
+    Scraper -->|"Demande d'audit des performances"| Lighthouse
+    Lighthouse -->|"Résultats de performance"| Scraper
+
+    Backend -->|"Demande de recommandations IA"| AI
+    AI -->|"Recommandations IA"| Backend
+
+    AI -->|"Génération des recommandations"| Ollama
+    Ollama -->|"Réponse générée"| AI
+
+    Backend <-->|"Lecture / écriture des données d'audit"| PostgreSQL
+
+    classDef frontend fill:#dceeff,stroke:#3286c8,color:#17324d,stroke-width:1.5px
+    classDef backend fill:#e8e0ff,stroke:#8560d8,color:#30204f,stroke-width:1.5px
+    classDef processing fill:#e1f3e5,stroke:#4b9b61,color:#193d25,stroke-width:1.5px
+    classDef infrastructure fill:#fff0d9,stroke:#d99427,color:#57380c,stroke-width:1.5px
+    classDef user fill:#e5f2ff,stroke:#c8d9e8,color:#174a7e
+
+    class User user
+    class Frontend frontend
+    class Backend backend
+    class Scraper,Lighthouse,AI processing
+    class Redis,Ollama,PostgreSQL infrastructure
+
 
 ### Services et responsabilités
 
