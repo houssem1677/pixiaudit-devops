@@ -398,35 +398,5 @@ The test confirmed that the restored database contained the expected tables and 
 
 For the complete backup and recovery procedure, see:
 
-[`docs/backup-recovery.md`](docs/backup-recovery.md)
-
-## 10. Documentation
-
-Additional documentation is available in the `docs/` directory.
-
-| Document | Description |
-|---|---|
-| [`docs/backup-recovery.md`](docs/backup-recovery.md) | PostgreSQL backup, verification, and recovery procedures |
-
 ---
 
-## Technologies Used
-
-| Category | Technologies |
-|---|---|
-| Frontend | Next.js, React, TypeScript |
-| Backend | NestJS, TypeORM, Node.js |
-| Scraping | Python, FastAPI, BeautifulSoup |
-| Performance analysis | Node.js, Lighthouse, Google Chrome |
-| AI | FastAPI, Ollama, Mistral |
-| Database | PostgreSQL |
-| Queue | Redis, Bull |
-| Containerization | Docker, Docker Compose |
-| CI/CD | GitHub Actions |
-| Container registry | GitHub Container Registry (GHCR) |
-| Deployment | Self-hosted GitHub Actions runner |
-| Backup | PostgreSQL `pg_dump`, `pg_restore`, cron |
-
----
-
-**PixiAudit — DevOps, Containerization, CI/CD, and Production Deployment.**
