@@ -24,39 +24,50 @@ PixiAudit follows a multi-service architecture combining Next.js, NestJS, Python
 
 ### Application architecture diagram
 
-```mermaid
+
 flowchart TB
     User["User / Browser"]
-
-    subgraph Application["PixiAudit Application"]
-        Frontend["Frontend<br/>Next.js"]
-        Backend["Backend API<br/>NestJS"]
-    end
-
-    subgraph Processing["Audit Processing Services"]
-        Redis[("Redis<br/>Bull Queue")]
-        Scraper["Scraper<br/>Python / FastAPI"]
-        Lighthouse["Lighthouse<br/>Node.js / Chrome"]
-        AI["AI Service<br/>Python / FastAPI"]
-        Ollama["Ollama<br/>Mistral Model"]
-    end
-
-    subgraph Storage["Data Storage"]
-        PostgreSQL[("PostgreSQL")]
-    end
+    Frontend["Frontend<br/>Next.js<br/>:3000"]
+    Backend["Backend API<br/>NestJS<br/>:3001"]
+    Redis[("Redis<br/>Bull Queue")]
+    Scraper["Scraper Service<br/>Python FastAPI<br/>:8002"]
+    Lighthouse["Lighthouse Service<br/>Node.js + Chrome<br/>:8003"]
+    AI["AI Analysis Service<br/>Python FastAPI<br/>:8000"]
+    Ollama["Ollama<br/>Mistral"]
+    PostgreSQL[("PostgreSQL<br/>Database")]
 
     User --> Frontend
-    Frontend --> Backend
-    Backend --> Redis
-    Redis --> Backend
-    Backend --> Scraper
-    Scraper --> Lighthouse
-    Backend --> AI
-    AI --> Ollama
-    Backend --> PostgreSQL
-    Scraper --> PostgreSQL
-    Backend --> Frontend
-```
+    Frontend <-->|"REST API"| Backend
+
+    Backend -->|"Enqueue audit job"| Redis
+    Redis -->|"Job available"| Backend
+
+    Backend -->|"Scraping task"| Scraper
+    Scraper -->|"Scraping results"| Backend
+
+    Scraper -->|"Performance audit request"| Lighthouse
+    Lighthouse -->|"Performance results"| Scraper
+
+    Backend -->|"AI recommendation request"| AI
+    AI -->|"AI recommendations"| Backend
+
+    AI -->|"Generate recommendations"| Ollama
+    Ollama -->|"Generated response"| AI
+
+    Backend <-->|"Read / write audit data"| PostgreSQL
+
+    classDef frontend fill:#dceeff,stroke:#3286c8,color:#17324d,stroke-width:1.5px
+    classDef backend fill:#e8e0ff,stroke:#8560d8,color:#30204f,stroke-width:1.5px
+    classDef processing fill:#e1f3e5,stroke:#4b9b61,color:#193d25,stroke-width:1.5px
+    classDef infrastructure fill:#fff0d9,stroke:#d99427,color:#57380c,stroke-width:1.5px
+    classDef user fill:#e5f2ff,stroke:#c8d9e8,color:#174a7e
+
+    class User user
+    class Frontend frontend
+    class Backend backend
+    class Scraper,Lighthouse,AI processing
+    class Redis,Ollama,PostgreSQL infrastructure
+
 
 ### Services and responsibilities
 
