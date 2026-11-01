@@ -1,5 +1,12 @@
-[🇬🇧 English](README.md) | [🇫🇷 Français](README.fr.md)
 
+<text color="secondary" size="xs">The outer Markdown code fence above is for copying the complete section. Your actual README must contain the inner Mermaid fence, not the outer fence.</text>
+
+### 2. Fix the language switcher
+
+At the top of `README.md`:
+
+```markdown
+[🇬🇧 English](README.md) | [🇫🇷 Français](README.fr.md)
 # PixiAudit — DevOps et Déploiement
 
 ## 1. Présentation du projet
@@ -24,7 +31,7 @@ PixiAudit repose sur une architecture composée de plusieurs services utilisant 
 
 ### Diagramme de l'architecture applicative
 
-
+```mermaid
 flowchart TB
     User["Utilisateur / Navigateur"]
     Frontend["Frontend<br/>Next.js<br/>:3000"]
