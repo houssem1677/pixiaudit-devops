@@ -1,0 +1,237 @@
+
+name: pixiaudit-deploy
+
+services:
+  frontend:
+    image: ghcr.io/houssem1677/pixiaudit-frontend:${IMAGE_TAG:-latest}
+    pull_policy: always
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - frontend-network
+    restart: unless-stopped
+
+  backend:
+    image: ghcr.io/houssem1677/pixiaudit-backend:${IMAGE_TAG:-latest}
+    pull_policy: always
+    environment:
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_USER: pixiaudit_user
+      DATABASE_PASSWORD_FILE: /run/secrets/postgres_password
+      DATABASE_NAME: pixiaudit_db
+
+      FRONTEND_URL: http://localhost:3000
+
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+
+      SCRAPER_URL: http://scraper:8002
+      AI_SERVICE_URL: http://ai-service:8000
+
+      JWT_SECRET_FILE: /run/secrets/jwt_secret
+      JWT_EXPIRES_IN: 7d
+
+      SMTP_HOST: smtp-relay.brevo.com
+      SMTP_PORT: 587
+      SMTP_USER: ${SMTP_USER}
+      SMTP_FROM: ${SMTP_FROM}
+      SMTP_PASSWORD_FILE: /run/secrets/smtp_password
+
+    secrets:
+      - postgres_password
+      - jwt_secret
+      - smtp_password
+
+    ports:
+      - "127.0.0.1:3001:3001"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      scraper:
+        condition: service_healthy
+      ai-service:
+        condition: service_healthy
+
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3001/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+    networks:
+      - frontend-network
+      - backend-network
+    restart: unless-stopped
+
+  scraper:
+    image: ghcr.io/houssem1677/pixiaudit-scraper:${IMAGE_TAG:-latest}
+    pull_policy: always
+    environment:
+      LIGHTHOUSE_SERVICE_URL: http://lighthouse:8003
+      BACKEND_URL: http://backend:3001
+    depends_on:
+      lighthouse:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8002/health', timeout=5)"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - backend-network
+    restart: unless-stopped
+
+  ai-service:
+    image: ghcr.io/houssem1677/pixiaudit-ai-service:${IMAGE_TAG:-latest}
+    pull_policy: always
+    depends_on:
+      model-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    networks:
+      - backend-network
+      - ai-service-network
+    restart: unless-stopped
+
+  lighthouse:
+    image: ghcr.io/houssem1677/pixiaudit-lighthouse:${IMAGE_TAG:-latest}
+    pull_policy: always
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:8003/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - backend-network
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:0.40.11
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - ai-service-network
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+
+  model-init:
+    image: ollama/ollama:0.40.11
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    volumes:
+      - ollama_data:/root/.ollama
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        until ollama list >/dev/null 2>&1; do
+          sleep 2
+        done
+        if ! ollama list | grep -q 'mistral'; then
+          ollama pull mistral
+        fi
+    depends_on:
+      ollama:
+        condition: service_healthy
+    networks:
+      - ai-service-network
+    restart: "no"
+
+  postgres:
+    image: postgres:17.11
+    environment:
+      POSTGRES_USER: pixiaudit_user
+      POSTGRES_DB: pixiaudit_db
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
+    volumes:
+      - postgres_deploy_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        ["CMD-SHELL", "pg_isready -U pixiaudit_user -d pixiaudit_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend-network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.4.11
+    volumes:
+      - redis_deploy_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend-network
+    restart: unless-stopped
+
+networks:
+  frontend-network:
+  backend-network:
+  ai-service-network:
+
+volumes:
+  postgres_deploy_data:
+  redis_deploy_data:
+
+  ollama_data:
+    external: true
+    name: pixiaudit_ollama_data
+
+secrets:
+  postgres_password:
+    file: ./secrets/postgres_password.txt
+  jwt_secret:
+    file: ./secrets/jwt_secret.txt
+  smtp_password:
+    file: ./secrets/smtp_password.txt
