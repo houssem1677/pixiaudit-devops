@@ -82,7 +82,3 @@ jobs:
           TEST_DATABASE_NAME: pixiaudit_test
           REDIS_HOST: 127.0.0.1
           REDIS_PORT: 6379
-
-      - name: Dependency audit (non-blocking for now)
-        run: npm audit --audit-level=critical
-        continue-on-error: true

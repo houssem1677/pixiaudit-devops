@@ -27,3 +27,14 @@ Thumbs.db
 
 # Logs and generated output
 *.log
+
+# Python test and tooling caches
+**/.ruff_cache/
+**/.tox/
+
+# TypeScript build metadata
+**/*.tsbuildinfo
+
+# Test reports
+**/test-results/
+**/playwright-report/
