@@ -300,11 +300,6 @@ The application services are updated in the following order:
 
 PostgreSQL, Redis, and Ollama are not updated as part of the application image deployment sequence.
 
-### Manual deployment
-
-The repository also contains `deploy.sh`, which provides a manual deployment mechanism using the production Compose configuration.
-
-It is separate from the restricted deployment helper used by the automated CD workflow.
 
 ## 8. Production Environment
 
@@ -327,25 +322,7 @@ docker-compose.deploy.yml
 | Redis | `redis:7.4.11` |
 | Ollama | `ollama/ollama:0.40.11` |
 
-### Production configuration
 
-The production configuration includes:
-
-- Dedicated Docker networks for service communication.
-- Persistent volumes for database, Redis, and Ollama data.
-- Environment variables managed through `.env.deploy`.
-- Sensitive values provided through Docker Compose secrets.
-- Health checks for application and infrastructure services.
-- Application ports bound to the host loopback interface.
-
-The frontend and backend are exposed on:
-
-| Service | Host binding |
-|---|---|
-| Frontend | `127.0.0.1:3000` |
-| Backend | `127.0.0.1:3001` |
-
-The frontend container explicitly uses `HOSTNAME=0.0.0.0` so that the Next.js server listens on all container interfaces and can be reached by Docker health checks and other services.
 
 ### Environment and secrets
 
@@ -361,63 +338,4 @@ Sensitive values such as the PostgreSQL password, JWT secret, and SMTP password 
 
 These files are also excluded from Git and protected with restrictive permissions.
 
-## 9. PostgreSQL Backup and Recovery
 
-PixiAudit includes an automated PostgreSQL backup script:
-
-```text
-backup-postgres.sh
-```
-
-The script creates PostgreSQL custom-format dumps using `pg_dump`.
-
-### Backup process
-
-The backup script:
-
-1. Creates the backup directory if it does not exist.
-2. Generates a timestamped backup filename.
-3. Runs `pg_dump` inside the PostgreSQL container.
-4. Writes the dump to a temporary file.
-5. Verifies the dump using `pg_restore --list`.
-6. Moves the verified dump to its final filename.
-7. Removes backup files older than the configured retention period.
-
-### Automated scheduling
-
-A cron job schedules the backup script to run every day at 02:00.
-
-```cron
-0 2 * * * /home/mahdi/pixiaudit-devops/backup-postgres.sh >> /home/mahdi/pixiaudit-backups/backup.log 2>&1
-```
-
-The backup directory is stored separately from the application repository.
-
-### Recovery testing
-
-A recovery test was performed by restoring a backup into a separate PostgreSQL test database.
-
-The restored database was checked by comparing table names and row counts with the original database.
-
-The test covered the following tables:
-
-- `users`
-- `audits`
-- `crawled_pages`
-- `performance_results`
-- `recommendation_history`
-- `security_results`
-- `seo_results`
-- `audit_settings`
-
-The test confirmed that the restored database contained the expected tables and matching row counts.
-
-For the complete backup and recovery procedure, see [`docs/backup-recovery.md`](docs/backup-recovery.md).
-
-## 10. Documentation
-
-| Document | Description |
-|---|---|
-| [`README.md`](README.md) | Main project documentation in English |
-| [`README.fr.md`](README.fr.md) | French project documentation |
-| [`docs/backup-recovery.md`](docs/backup-recovery.md) | Detailed PostgreSQL backup and recovery procedure |
