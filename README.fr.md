@@ -1,26 +1,26 @@
 [🇬🇧 English](README.md) | [🇫🇷 Français](README.fr.md)
 
-# PixiAudit — DevOps et Déploiement
+# PixiAudit — DevOps & Déploiement
 
 ## 1. Présentation du projet
 
-PixiAudit est une application web conçue pour automatiser les audits de sites web et générer des recommandations. Elle combine l'exploration de sites web, l'analyse des performances et des recommandations générées par l'intelligence artificielle afin d'évaluer les sites web.
+PixiAudit est une application web conçue pour automatiser les audits de sites web et générer des recommandations. Elle combine l'exploration de sites web, l'analyse des performances et la génération de recommandations par intelligence artificielle afin d'évaluer les sites web.
 
-Ce dépôt est consacré à l'**infrastructure DevOps et au déploiement** de PixiAudit. Il regroupe les services de l'application, leur conteneurisation avec Docker, les workflows CI/CD, le déploiement en production ainsi que les procédures de sauvegarde PostgreSQL.
+Ce dépôt est consacré à l'infrastructure DevOps et au déploiement de PixiAudit. Il regroupe les différents services de l'application, leur conteneurisation avec Docker, les workflows CI/CD, le déploiement en production ainsi que les procédures de sauvegarde de la base de données PostgreSQL.
 
 ### Objectifs principaux
 
-- Conteneuriser les services de l'application avec Docker.
-- Orchestrer les services à l'aide de Docker Compose.
-- Mettre en place des workflows CI automatisés avec GitHub Actions.
+- Conteneuriser les services de l'application à l'aide de Docker.
+- Orchestrer les services avec Docker Compose.
+- Mettre en place des workflows d'intégration continue (CI) avec GitHub Actions.
 - Construire et publier les images Docker sur GitHub Container Registry (GHCR).
-- Automatiser le déploiement en production à l'aide d'un runner GitHub Actions auto-hébergé.
-- Ajouter des vérifications de l'état des services et un mécanisme de rollback.
-- Mettre en place des procédures de sauvegarde et de restauration PostgreSQL.
+- Automatiser le déploiement en production à l'aide d'un runner GitHub Actions auto-hébergé (Self-hosted Runner).
+- Mettre en place des vérifications de santé (Health Checks) et un mécanisme de retour à la version précédente (Rollback).
+- Implémenter des procédures de sauvegarde et de restauration de PostgreSQL.
 
 ## 2. Vue d'ensemble de l'architecture
 
-PixiAudit repose sur une architecture composée de plusieurs services utilisant Next.js, NestJS, Python, Node.js, PostgreSQL, Redis et Ollama.
+PixiAudit repose sur une architecture multi-services combinant Next.js, NestJS, Python, Node.js, PostgreSQL, Redis et Ollama.
 
 ### Diagramme de l'architecture applicative
 
@@ -28,9 +28,9 @@ PixiAudit repose sur une architecture composée de plusieurs services utilisant 
 flowchart TB
     User["Utilisateur / Navigateur"]
     Frontend["Frontend<br/>Next.js<br/>:3000"]
-    Backend["API Backend<br/>NestJS<br/>:3001"]
+    Backend["Backend API<br/>NestJS<br/>:3001"]
     Redis[("Redis<br/>File d'attente Bull")]
-    Scraper["Service de scraping<br/>Python FastAPI<br/>:8002"]
+    Scraper["Service Scraper<br/>Python FastAPI<br/>:8002"]
     Lighthouse["Service Lighthouse<br/>Node.js + Chrome<br/>:8003"]
     AI["Service d'analyse IA<br/>Python FastAPI<br/>:8000"]
     Ollama["Ollama<br/>Mistral"]
@@ -39,19 +39,19 @@ flowchart TB
     User --> Frontend
     Frontend <-->|"API REST"| Backend
 
-    Backend -->|"Mise en file d'attente du job d'audit"| Redis
-    Redis -->|"Job disponible"| Backend
+    Backend -->|"Mise en file d'une tâche d'audit"| Redis
+    Redis -->|"Tâche disponible"| Backend
 
     Backend -->|"Tâche de scraping"| Scraper
     Scraper -->|"Résultats du scraping"| Backend
 
-    Scraper -->|"Demande d'audit des performances"| Lighthouse
-    Lighthouse -->|"Résultats de performance"| Scraper
+    Scraper -->|"Demande d'analyse des performances"| Lighthouse
+    Lighthouse -->|"Résultats des performances"| Scraper
 
     Backend -->|"Demande de recommandations IA"| AI
-    AI -->|"Recommandations IA"| Backend
+    AI -->|"Recommandations générées"| Backend
 
-    AI -->|"Génération des recommandations"| Ollama
+    AI -->|"Génération de recommandations"| Ollama
     Ollama -->|"Réponse générée"| AI
 
     Backend <-->|"Lecture / écriture des données d'audit"| PostgreSQL
@@ -76,21 +76,21 @@ flowchart TB
 | Frontend | Next.js, React, TypeScript | Interface utilisateur et gestion des audits |
 | Backend | NestJS, TypeORM | API REST, authentification, logique applicative et gestion de la file d'attente des audits |
 | Scraper | Python, FastAPI | Exploration des sites web et collecte des données |
-| Lighthouse | Node.js, Chrome | Analyse des performances des sites web avec Lighthouse |
-| Service IA | Python, FastAPI | Génération de recommandations à l'aide du modèle d'IA |
+| Lighthouse | Node.js, Chrome | Analyse des performances des sites web à l'aide de Lighthouse |
+| AI Service | Python, FastAPI | Génération de recommandations à l'aide du modèle d'IA |
 | Ollama | Ollama, Mistral | Exécution du modèle de langage local |
-| PostgreSQL | PostgreSQL 17.11 | Stockage persistant des données applicatives et des audits |
+| PostgreSQL | PostgreSQL 17.11 | Stockage persistant des données de l'application et des audits |
 | Redis | Redis 7.4.11 | Gestion des files d'attente et des tâches en arrière-plan avec Bull |
 
-### Flux de traitement d'un audit
+### Processus de traitement d'un audit
 
-1. L'utilisateur soumet une demande d'audit depuis le frontend Next.js.
+1. L'utilisateur soumet une demande d'audit via le frontend Next.js.
 2. Le backend NestJS reçoit la demande et gère le processus d'audit.
 3. Le backend utilise Redis et Bull pour gérer les tâches d'audit en arrière-plan.
-4. Le scraper collecte les informations du site web.
+4. Le service Scraper collecte les informations du site web.
 5. Le service Lighthouse effectue l'analyse des performances à l'aide de Chrome.
 6. Le service IA traite les informations de l'audit et communique avec Ollama afin de générer des recommandations.
-7. Le backend enregistre les résultats correspondants dans PostgreSQL.
+7. Le backend enregistre les résultats nécessaires dans PostgreSQL.
 8. Le frontend affiche les résultats de l'audit et les recommandations.
 
 ## 3. Structure du dépôt
@@ -132,29 +132,29 @@ pixiaudit-devops/
 
 Chaque service applicatif possède son propre Dockerfile, ce qui permet de construire et de déployer les images indépendamment.
 
-### Builds multi-stage
+### Builds multi-étapes (Multi-stage Builds)
 
-Le frontend et le backend utilisent des builds Docker multi-stage afin de séparer les dépendances nécessaires à la compilation de l'environnement d'exécution.
+Le frontend et le backend utilisent des builds Docker multi-étapes afin de séparer les dépendances nécessaires à la compilation de celles requises pour l'exécution.
 
-Cette approche permet de réduire la taille des images finales et d'éviter d'inclure les dépendances de développement dans les images utilisées en production.
+Cette approche permet de réduire la taille des images finales et d'exclure les dépendances de développement de l'environnement d'exécution en production.
 
 ### Conteneurisation spécifique à chaque service
 
 - **Frontend :** utilise une image basée sur Node.js Alpine et le mode standalone de Next.js.
-- **Backend :** utilise un environnement de build et d'exécution basé sur Node.js Alpine.
+- **Backend :** utilise un environnement de compilation et d'exécution basé sur Node.js Alpine.
 - **Scraper :** utilise Python Slim avec les dépendances nécessaires à l'exploration et à la collecte des données.
-- **Service IA :** utilise Python Slim avec FastAPI et le client Ollama.
-- **Lighthouse :** utilise Node.js avec Google Chrome installé pour l'analyse des performances via un navigateur.
+- **AI Service :** utilise Python Slim avec FastAPI et le client Ollama.
+- **Lighthouse :** utilise Node.js avec Google Chrome installé pour effectuer des analyses de performances basées sur un navigateur.
 
-Les composants Scraper et Lighthouse sont maintenus dans deux services distincts. Cette séparation s'explique par l'utilisation de deux environnements technologiques différents : Python pour le scraping et Node.js pour Lighthouse. Lighthouse nécessite également Google Chrome, ce qui implique des dépendances supplémentaires à l'installation et à l'exécution.
+Les composants Scraper et Lighthouse sont maintenus dans des services distincts. Cette séparation s'explique par l'utilisation de deux environnements technologiques différents : Python pour le scraping et Node.js pour Lighthouse. Lighthouse nécessite également Google Chrome, ce qui introduit des dépendances spécifiques à l'installation et à l'exécution.
 
 Cette séparation facilite la construction, la configuration, la maintenance et le dépannage de chaque service.
 
 ### Docker Compose
 
-Docker Compose orchestre les services applicatifs ainsi que leurs dépendances d'infrastructure.
+Docker Compose permet d'orchestrer les services applicatifs ainsi que leurs dépendances d'infrastructure.
 
-Le dépôt contient plusieurs configurations Compose adaptées aux différents environnements :
+Le dépôt comprend différentes configurations Compose adaptées aux différents environnements :
 
 | Fichier | Utilisation |
 |---|---|
@@ -172,14 +172,14 @@ L'environnement Docker local exécute les services applicatifs ainsi que leurs d
 - Backend
 - Scraper
 - Lighthouse
-- Service IA
+- AI Service
 - Ollama
 - PostgreSQL
 - Redis
 
-### Organisation du réseau
+### Organisation des réseaux
 
-Docker Compose utilise des réseaux distincts afin de contrôler la communication entre les composants applicatifs et les services d'infrastructure.
+Docker Compose utilise plusieurs réseaux distincts afin de contrôler la communication entre les composants applicatifs et les services d'infrastructure.
 
 Les services communiquent entre eux en utilisant leurs noms de services Compose plutôt que des adresses IP spécifiques à la machine hôte.
 
@@ -187,9 +187,9 @@ Les services communiquent entre eux en utilisant leurs noms de services Compose 
 
 Des volumes Docker sont utilisés pour préserver les données importantes de l'application, notamment celles de PostgreSQL, Redis et Ollama.
 
-Ainsi, le redémarrage ou la recréation des conteneurs applicatifs ne supprime pas automatiquement les données persistantes stockées dans ces volumes.
+Cela permet de redémarrer ou de recréer les conteneurs sans supprimer automatiquement les données persistantes stockées dans ces volumes.
 
-## 6. Intégration continue (CI)
+## 6. Intégration continue (CI — Continuous Integration)
 
 GitHub Actions automatise la validation et les tests des différents services de PixiAudit.
 
@@ -197,43 +197,43 @@ GitHub Actions automatise la validation et les tests des différents services de
 
 | Workflow | Responsabilité |
 |---|---|
-| `frontend-ci.yml` | Validation et build du frontend |
-| `backend-ci.yml` | Validation, tests et build du backend |
-| `scraper-lighthouse-ci.yml` | Validation du Scraper et de Lighthouse |
+| `frontend-ci.yml` | Validation et compilation du frontend |
+| `backend-ci.yml` | Validation, tests et compilation du backend |
+| `scraper-lighthouse-ci.yml` | Validation des services Scraper et Lighthouse |
 | `ai-service-ci.yml` | Validation du service IA |
 | `compose-ci.yml` | Tests d'intégration de l'ensemble de l'application avec Compose |
 
-### Tests d'intégration avec Compose
+### Tests d'intégration avec Docker Compose
 
 Le workflow Compose CI vérifie le fonctionnement de l'environnement applicatif intégré.
 
 Ses principales étapes sont les suivantes :
 
 1. Valider la configuration Docker Compose.
-2. Construire les images des services destinées à la CI.
+2. Construire les images des services destinées aux tests CI.
 3. Démarrer l'environnement de tests d'intégration.
-4. Utiliser des mocks CI pour les dépendances externes ou nécessitant beaucoup de ressources.
+4. Utiliser des mocks CI pour les dépendances externes ou nécessitant des ressources importantes.
 5. Vérifier l'état de santé et la disponibilité des services.
 6. Tester les principaux endpoints de l'application.
 7. Collecter les logs en cas d'échec.
 8. Arrêter et supprimer l'environnement CI.
 
-L'environnement CI utilise des mocks dédiés pour Lighthouse et Ollama. Cela permet d'effectuer les tests d'intégration sans dépendre de l'exécution d'un audit complet basé sur un navigateur ni du téléchargement et de l'exécution du modèle de langage.
+L'environnement CI utilise des mocks dédiés pour Lighthouse et Ollama. Cela permet d'effectuer les tests d'intégration sans dépendre de l'exécution d'un audit complet basé sur un navigateur ou du téléchargement et de l'exécution du modèle de langage.
 
 ### Publication des images Docker
 
 Après la réussite des tests d'intégration Compose, le workflow publie les cinq images applicatives sur GitHub Container Registry (GHCR).
 
-Les images publiées sont associées aux tags suivants :
+Les images publiées sont identifiées par les tags suivants :
 
 - `latest`
 - Le SHA du commit Git correspondant.
 
-La publication est limitée aux exécutions réussies associées aux pushs vers la branche `main`.
+La publication est limitée aux exécutions réussies associées à des pushs sur la branche `main`.
 
-## 7. Déploiement continu (CD)
+## 7. Déploiement continu (CD — Continuous Deployment)
 
-PixiAudit utilise un runner GitHub Actions auto-hébergé (*self-hosted runner*) pour automatiser le déploiement en production.
+PixiAudit utilise un runner GitHub Actions auto-hébergé (Self-hosted Runner) pour automatiser le déploiement en production.
 
 Le workflow de déploiement est déclenché après la réussite du workflow Compose CI sur la branche `main`.
 
@@ -241,39 +241,39 @@ Le workflow de déploiement est déclenché après la réussite du workflow Comp
 
 ```mermaid
 flowchart TD
-    A["Push GitHub vers main"] --> B["PixiAudit Compose CI"]
+    A["Push Git sur main"] --> B["PixiAudit Compose CI"]
     B --> C["Build et tests d'intégration"]
-    C --> D["Publication des 5 images Docker sur GHCR"]
-    D --> E["Réussite du workflow CI"]
-    E --> F["Workflow PixiAudit CD"]
-    F --> G["Runner de déploiement auto-hébergé"]
-    G --> H["Script de déploiement à accès restreint"]
-    H --> I["Récupération des images identifiées par SHA"]
+    C --> D["Publication de 5 images Docker sur GHCR"]
+    D --> E["Fin réussie du workflow CI"]
+    E --> F["Workflow CD PixiAudit"]
+    F --> G["Runner auto-hébergé de déploiement"]
+    G --> H["Script de déploiement restreint"]
+    H --> I["Téléchargement des images taguées avec le SHA"]
     I --> J["Docker Compose en production"]
-    J --> K["Vérifications de l'état des services"]
+    J --> K["Vérifications de santé en production"]
 ```
 
 ### Processus de déploiement
 
-1. Une modification est poussée vers la branche `main`.
+1. Une modification est envoyée (push) sur la branche `main`.
 2. Le workflow Compose CI construit les images applicatives et exécute les tests d'intégration.
 3. Après la réussite des tests d'intégration, les cinq images applicatives sont publiées sur GHCR.
 4. Le workflow CD démarre après la réussite du workflow CI.
-5. Le runner auto-hébergé invoque le script de déploiement à accès restreint.
+5. Le runner auto-hébergé invoque le script de déploiement restreint.
 6. Le script de déploiement reçoit le SHA exact du commit Git associé à l'exécution CI réussie.
-7. Les images identifiées par ce SHA sont récupérées depuis GHCR.
+7. Les images correspondant à ce SHA sont récupérées depuis GHCR.
 8. Docker Compose met à jour les services applicatifs en production.
-9. Des vérifications de santé confirment que les services déployés fonctionnent correctement.
+9. Les vérifications de santé permettent de confirmer le bon fonctionnement des services déployés.
 
-### Runner auto-hébergé
+### Runner auto-hébergé (Self-hosted Runner)
 
 Le runner de déploiement fonctionne sur l'hôte de production et est enregistré au niveau du dépôt GitHub.
 
-Il utilise un compte système dédié nommé `gha-deploy`. Ce compte ne dispose pas d'un accès direct au socket Docker ni de privilèges sudo généraux.
+Il utilise un compte système dédié nommé `gha-deploy`. Ce compte ne dispose ni d'un accès direct au socket Docker ni de privilèges sudo généraux.
 
-À la place, il est autorisé à invoquer un script de déploiement spécifique appartenant à root, au moyen d'une règle sudoers à accès restreint.
+À la place, il est autorisé à exécuter un script de déploiement spécifique, appartenant à l'utilisateur root, via une règle sudoers restreinte.
 
-### Script de déploiement et rollback
+### Script de déploiement et mécanisme de retour arrière (Rollback)
 
 Le script de déploiement est situé à l'emplacement suivant :
 
@@ -283,28 +283,22 @@ Le script de déploiement est situé à l'emplacement suivant :
 
 Il effectue les opérations suivantes :
 
-- Vérification du SHA du commit demandé.
-- Acquisition d'un verrou de déploiement.
-- Récupération des images nécessaires.
-- Mise à jour des services selon un ordre contrôlé.
-- Vérification du résultat du déploiement.
-- Tentative de restauration des images précédemment déployées en cas d'échec d'une mise à jour.
+- Valide le SHA du commit demandé.
+- Acquiert un verrou de déploiement afin d'éviter les exécutions simultanées.
+- Récupère les images Docker nécessaires.
+- Met à jour les services selon un ordre contrôlé.
+- Vérifie les résultats du déploiement.
+- Tente de restaurer les images précédemment déployées si une mise à jour échoue.
 
 Les services applicatifs sont mis à jour dans l'ordre suivant :
 
 1. Lighthouse
 2. Scraper
-3. Service IA
+3. AI Service
 4. Backend
 5. Frontend
 
 PostgreSQL, Redis et Ollama ne sont pas mis à jour dans le cadre de cette séquence de déploiement des images applicatives.
-
-### Déploiement manuel
-
-Le dépôt contient également le script `deploy.sh`, qui permet d'effectuer un déploiement manuel à l'aide de la configuration Compose de production.
-
-Ce script est distinct du script de déploiement à accès restreint utilisé par le workflow CD automatisé.
 
 ## 8. Environnement de production
 
@@ -314,110 +308,29 @@ L'environnement de production est orchestré à l'aide du fichier suivant :
 docker-compose.deploy.yml
 ```
 
-### Services de production
+### Services en production
 
 | Composant | Image / Technologie |
 |---|---|
-| Frontend | Image PixiAudit Frontend depuis GHCR |
-| Backend | Image PixiAudit Backend depuis GHCR |
-| Scraper | Image PixiAudit Scraper depuis GHCR |
-| Lighthouse | Image PixiAudit Lighthouse depuis GHCR |
-| Service IA | Image PixiAudit AI Service depuis GHCR |
+| Frontend | Image du frontend PixiAudit provenant de GHCR |
+| Backend | Image du backend PixiAudit provenant de GHCR |
+| Scraper | Image du Scraper PixiAudit provenant de GHCR |
+| Lighthouse | Image de Lighthouse PixiAudit provenant de GHCR |
+| AI Service | Image du service IA PixiAudit provenant de GHCR |
 | PostgreSQL | `postgres:17.11` |
 | Redis | `redis:7.4.11` |
 | Ollama | `ollama/ollama:0.40.11` |
 
-### Configuration de production
-
-La configuration de production comprend :
-
-- Des réseaux Docker dédiés à la communication entre les services.
-- Des volumes persistants pour la base de données, Redis et Ollama.
-- Des variables d'environnement gérées via `.env.deploy`.
-- Des valeurs sensibles fournies à l'aide des secrets Docker Compose.
-- Des health checks pour les services applicatifs et d'infrastructure.
-- Des ports applicatifs liés à l'interface réseau loopback de l'hôte.
-
-Le frontend et le backend sont exposés sur les adresses suivantes :
-
-| Service | Adresse de liaison sur l'hôte |
-|---|---|
-| Frontend | `127.0.0.1:3000` |
-| Backend | `127.0.0.1:3001` |
-
-Le conteneur frontend utilise explicitement `HOSTNAME=0.0.0.0` afin que le serveur Next.js écoute sur toutes les interfaces réseau du conteneur et puisse être accessible par les health checks Docker et les autres services.
-
 ### Variables d'environnement et secrets
 
-Le fichier d'environnement de production est :
+Le fichier de configuration de l'environnement de production est :
 
 ```text
 .env.deploy
 ```
 
-Il est exclu du dépôt Git et protégé par des permissions système restrictives.
+Il est exclu du dépôt Git et ses permissions d'accès sont restreintes.
 
-Les valeurs sensibles, telles que le mot de passe PostgreSQL, le secret JWT et le mot de passe SMTP, sont fournies par des fichiers situés dans le répertoire `secrets/`.
+Les valeurs sensibles, telles que le mot de passe PostgreSQL, le secret JWT et le mot de passe SMTP, sont fournies à travers des fichiers situés dans le répertoire `secrets/`.
 
-Ces fichiers sont également exclus du dépôt Git et protégés par des permissions restrictives.
-
-## 9. Sauvegarde et restauration PostgreSQL
-
-PixiAudit dispose d'un script automatisé de sauvegarde PostgreSQL :
-
-```text
-backup-postgres.sh
-```
-
-Ce script crée des sauvegardes PostgreSQL au format personnalisé (*custom format*) à l'aide de `pg_dump`.
-
-### Processus de sauvegarde
-
-Le script de sauvegarde effectue les opérations suivantes :
-
-1. Créer le répertoire de sauvegarde s'il n'existe pas.
-2. Générer un nom de fichier de sauvegarde avec un horodatage.
-3. Exécuter `pg_dump` à l'intérieur du conteneur PostgreSQL.
-4. Écrire la sauvegarde dans un fichier temporaire.
-5. Vérifier la sauvegarde à l'aide de `pg_restore --list`.
-6. Déplacer le fichier vérifié vers son nom définitif.
-7. Supprimer les fichiers de sauvegarde plus anciens que la période de rétention configurée.
-
-### Planification automatisée
-
-Une tâche cron planifie l'exécution du script de sauvegarde chaque jour à 02:00.
-
-```cron
-0 2 * * * /home/mahdi/pixiaudit-devops/backup-postgres.sh >> /home/mahdi/pixiaudit-backups/backup.log 2>&1
-```
-
-Le répertoire de sauvegarde est stocké séparément du dépôt de l'application.
-
-### Tests de restauration
-
-Un test de restauration a été effectué en restaurant une sauvegarde dans une base de données PostgreSQL de test distincte.
-
-La base restaurée a été vérifiée en comparant les noms des tables et leurs nombres d'enregistrements avec ceux de la base originale.
-
-Le test a porté sur les tables suivantes :
-
-- `users`
-- `audits`
-- `crawled_pages`
-- `performance_results`
-- `recommendation_history`
-- `security_results`
-- `seo_results`
-- `audit_settings`
-
-Le test a confirmé que la base restaurée contenait les tables attendues et que leurs nombres d'enregistrements correspondaient à ceux de la base originale.
-
-Pour consulter la procédure complète de sauvegarde et de restauration, voir [`docs/backup-recovery.md`](docs/backup-recovery.md).
-
-## 10. Documentation
-
-| Document | Description |
-|---|---|
-| [`README.md`](README.md) | Documentation principale du projet en anglais |
-| [`README.fr.md`](README.fr.md) | Documentation du projet en français |
-| [`docs/backup-recovery.md`](docs/backup-recovery.md) | Procédure détaillée de sauvegarde et de restauration PostgreSQL |
+Ces fichiers sont également exclus du dépôt Git et protégés par des permissions d'accès restrictives.
