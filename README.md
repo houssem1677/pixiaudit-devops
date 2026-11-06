@@ -338,4 +338,50 @@ Sensitive values such as the PostgreSQL password, JWT secret, and SMTP password 
 
 These files are also excluded from Git and protected with restrictive permissions.
 
+## 9. Security Model
 
+This section documents the security controls that protect the production deployment. The goal is to make the trust boundaries explicit, so that a change to any one control can be reviewed against the rest of the model.
+
+### 9.1 Trust boundaries
+
+The deployment architecture separates four distinct privilege levels:
+
+| Level | Identity / Location | What it can do |
+|---|---|---|
+| Contributor | Any GitHub account with push access | Open branches and pull requests |
+| CI | GitHub-hosted runners (`ubuntu-latest`) | Build, test, and publish images |
+| Deploy runner | `gha-deploy` system account on the production host | Invoke one restricted sudo rule, nothing else |
+| Privileged deploy | `root`, via `/usr/local/sbin/pixiaudit-deploy` | Run Docker Compose as the `mahdi` account |
+
+The `gha-deploy` account is deliberately **not** a member of the `docker` or `sudo` groups, and it cannot read `.env.deploy` or any file under `secrets/`.
+
+### 9.2 Branch protection on `main`
+
+The `main` branch is governed by an active ruleset named `Protect main`:
+
+- Direct pushes to `main` are blocked — changes must arrive through a pull request.
+- Force pushes to `main` are blocked (`non_fast_forward`).
+- Deletion of `main` is blocked.
+- The bypass list is empty, so no account — including the repository owner — can bypass the ruleset.
+
+Because the CD workflow only runs after a successful `PixiAudit Compose CI` run on `main`, every deployable change is tied to a pull request and a passing CI run.
+
+The ruleset currently does **not** require an approving review. This is intentional for a solo-maintained repository: GitHub does not allow an author to approve their own pull request, so requiring one approval would deadlock every change. The enforced property is instead "no direct pushes, no force pushes, every deploy comes from a CI-validated PR."
+
+### 9.3 Deployment trigger restrictions
+
+The CD workflow is triggered by `workflow_run` completion, and its `if:` condition rejects any run that is not all of:
+
+- A **successful** Compose CI run.
+- Triggered by a **push** event (not a pull request).
+- Targeting the **`main`** branch.
+- Originating from the **same repository** (`head_repository.full_name == github.repository`).
+
+The effect is that pull requests — including those opened from forks — cannot reach the self-hosted runner, even if they modify the workflow files.
+
+### 9.4 Restricted sudo and the deployment helper
+
+The `gha-deploy` account has exactly one sudo permission:
+
+```text
+(root) NOPASSWD: /usr/local/sbin/pixiaudit-deploy ""

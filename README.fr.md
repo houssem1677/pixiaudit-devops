@@ -334,3 +334,50 @@ Il est exclu du dépôt Git et ses permissions d'accès sont restreintes.
 Les valeurs sensibles, telles que le mot de passe PostgreSQL, le secret JWT et le mot de passe SMTP, sont fournies à travers des fichiers situés dans le répertoire `secrets/`.
 
 Ces fichiers sont également exclus du dépôt Git et protégés par des permissions d'accès restrictives.
+## 9. Modèle de sécurité
+
+Cette section documente les contrôles de sécurité qui protègent le déploiement en production. L'objectif est de rendre explicites les frontières de confiance, afin que toute modification d'un contrôle puisse être évaluée par rapport au reste du modèle.
+
+### 9.1 Frontières de confiance
+
+L'architecture de déploiement distingue quatre niveaux de privilèges :
+
+| Niveau | Identité / Emplacement | Ce qu'il peut faire |
+|---|---|---|
+| Contributeur | Tout compte GitHub disposant d'un accès en écriture | Créer des branches et des pull requests |
+| CI | Runners hébergés par GitHub (`ubuntu-latest`) | Construire, tester et publier les images |
+| Runner de déploiement | Compte système `gha-deploy` sur l'hôte de production | Invoquer une seule règle sudo restreinte, rien d'autre |
+| Déploiement privilégié | `root`, via `/usr/local/sbin/pixiaudit-deploy` | Exécuter Docker Compose sous le compte `mahdi` |
+
+Le compte `gha-deploy` n'appartient volontairement ni au groupe `docker` ni au groupe `sudo`, et il ne peut lire ni `.env.deploy` ni aucun fichier du répertoire `secrets/`.
+
+### 9.2 Protection de la branche `main`
+
+La branche `main` est régie par un ruleset actif nommé `Protect main` :
+
+- Les pushs directs sur `main` sont bloqués — toute modification doit passer par une pull request.
+- Les force pushs sur `main` sont bloqués (`non_fast_forward`).
+- La suppression de `main` est bloquée.
+- La liste de contournement (bypass list) est vide : aucun compte, y compris le propriétaire du dépôt, ne peut contourner ces règles.
+
+Étant donné que le workflow CD ne s'exécute qu'après la réussite du workflow `PixiAudit Compose CI` sur `main`, chaque modification déployable est liée à une pull request et à une exécution CI réussie.
+
+Le ruleset n'exige actuellement **pas** d'approbation. Ce choix est volontaire pour un dépôt maintenu par une seule personne : GitHub n'autorise pas l'auteur d'une pull request à approuver sa propre PR, donc exiger une approbation bloquerait chaque modification. La propriété réellement garantie est plutôt : « aucun push direct, aucun force push, chaque déploiement provient d'une PR validée par la CI ».
+
+### 9.3 Restrictions sur le déclenchement du déploiement
+
+Le workflow CD est déclenché par la fin d'un workflow (`workflow_run`), et sa condition `if:` rejette toute exécution qui ne réunit pas **tous** les critères suivants :
+
+- Une exécution **réussie** du workflow Compose CI.
+- Déclenchée par un événement **push** (et non par une pull request).
+- Ciblant la branche **`main`**.
+- Provenant du **même dépôt** (`head_repository.full_name == github.repository`).
+
+Il en résulte que les pull requests — y compris celles ouvertes depuis des forks — ne peuvent pas atteindre le runner auto-hébergé, même si elles modifient les fichiers de workflow.
+
+### 9.4 Sudo restreint et script de déploiement
+
+Le compte `gha-deploy` ne dispose que d'une seule permission sudo :
+
+```text
+(root) NOPASSWD: /usr/local/sbin/pixiaudit-deploy ""
